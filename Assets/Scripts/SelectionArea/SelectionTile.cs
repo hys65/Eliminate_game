@@ -55,11 +55,15 @@ namespace EliminateGame.SelectionArea
 
         private void OnMouseDown()
         {
+            Debug.Log($"OnMouseDown hit: ({x},{y}) {color}, enabled={enabled}, removed={IsRemoved}, unlocked={isUnlocked}");
+
             if (!enabled || IsRemoved || !isUnlocked)
             {
+                Debug.Log($"Click ignored: ({x},{y}) {color}");
                 return;
             }
 
+            Debug.Log($"Click accepted: ({x},{y}) {color}");
             Clicked?.Invoke(this);
         }
     }
