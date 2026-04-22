@@ -60,6 +60,7 @@ namespace EliminateGame.SelectionArea
 
         private void HandleTileClicked(SelectionTile tile)
         {
+            Debug.Log($"HandleTileClicked: ({tile.X},{tile.Y}) {tile.Color}");
             TileSelected?.Invoke(tile);
         }
 
