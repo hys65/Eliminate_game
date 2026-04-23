@@ -37,18 +37,10 @@ namespace EliminateGame.Pattern
 
                 foreach (BlockColor color in row)
                 {
-                    if (color == BlockColor.None)
-                    {
-                        continue;
-                    }
-
                     builtRow.Add(new PatternCell(color));
                 }
 
-                if (builtRow.Count > 0)
-                {
-                    patternRows.Add(builtRow);
-                }
+                patternRows.Add(builtRow);
             }
 
             RefreshVisuals();
@@ -57,34 +49,35 @@ namespace EliminateGame.Pattern
 
         public IReadOnlyList<BlockColor> GetBottomRowColors()
         {
-            if (patternRows.Count == 0)
+            int bottomIndex = GetBottomRowIndex();
+            if (bottomIndex < 0)
             {
                 return Array.Empty<BlockColor>();
             }
 
-            int bottomIndex = patternRows.Count - 1;
-            return patternRows[bottomIndex].Select(cell => cell.Color).ToList();
+            List<PatternCell> bottomRow = patternRows[bottomIndex];
+            return bottomRow.Where(cell => cell.Color != BlockColor.None).Select(cell => cell.Color).ToList();
         }
 
         public int GetBottomRowCount(BlockColor color)
         {
-            if (patternRows.Count == 0)
+            int bottomIndex = GetBottomRowIndex();
+            if (bottomIndex < 0)
             {
                 return 0;
             }
 
-            int bottomIndex = patternRows.Count - 1;
             return patternRows[bottomIndex].Count(c => c.Color == color);
         }
 
         public PatternResolveResult ResolveAgainstBottomRow(BlockColor color)
         {
-            if (patternRows.Count == 0)
+            int bottomIndex = GetBottomRowIndex();
+            if (bottomIndex < 0)
             {
                 return PatternResolveResult.NoMatch();
             }
 
-            int bottomIndex = patternRows.Count - 1;
             List<PatternCell> bottomRow = patternRows[bottomIndex];
             List<int> colorIndices = new List<int>();
 
@@ -103,7 +96,7 @@ namespace EliminateGame.Pattern
 
             if (colorIndices.Count < 3)
             {
-                RemoveCellsAtIndices(bottomRow, colorIndices);
+                SetCellsToNone(bottomRow, colorIndices);
                 CollapseIfNeeded();
                 RefreshVisuals();
                 Debug.Log($"Pattern Case A resolved for {color}. Removed={colorIndices.Count} from bottom row.");
@@ -111,19 +104,39 @@ namespace EliminateGame.Pattern
             }
 
             List<int> firstThree = colorIndices.Take(3).ToList();
-            RemoveCellsAtIndices(bottomRow, firstThree);
+            SetCellsToNone(bottomRow, firstThree);
             CollapseIfNeeded();
             RefreshVisuals();
             Debug.Log($"Pattern Case B resolved for {color}. Removed=3 from bottom row (left-to-right).");
             return PatternResolveResult.CaseB(3);
         }
 
-        private static void RemoveCellsAtIndices(List<PatternCell> row, List<int> indicesAscending)
+        private int GetBottomRowIndex()
         {
-            for (int i = indicesAscending.Count - 1; i >= 0; i--)
+            for (int rowIndex = patternRows.Count - 1; rowIndex >= 0; rowIndex--)
             {
-                int index = indicesAscending[i];
-                row.RemoveAt(index);
+                List<PatternCell> row = patternRows[rowIndex];
+                for (int colIndex = 0; colIndex < row.Count; colIndex++)
+                {
+                    if (row[colIndex].Color != BlockColor.None)
+                    {
+                        return rowIndex;
+                    }
+                }
+            }
+
+            return -1;
+        }
+
+        private static void SetCellsToNone(List<PatternCell> row, List<int> indices)
+        {
+            for (int i = 0; i < indices.Count; i++)
+            {
+                int index = indices[i];
+                if (index >= 0 && index < row.Count)
+                {
+                    row[index].Color = BlockColor.None;
+                }
             }
         }
 
@@ -131,13 +144,26 @@ namespace EliminateGame.Pattern
         {
             for (int i = patternRows.Count - 1; i >= 0; i--)
             {
-                if (patternRows[i].Count == 0)
+                if (IsAllNoneRow(patternRows[i]))
                 {
                     patternRows.RemoveAt(i);
                 }
             }
 
             Debug.Log($"Pattern collapse check complete. Rows={patternRows.Count}, Bottom=[{string.Join(",", GetBottomRowColors())}]");
+        }
+
+        private static bool IsAllNoneRow(List<PatternCell> row)
+        {
+            for (int i = 0; i < row.Count; i++)
+            {
+                if (row[i].Color != BlockColor.None)
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         private void RefreshVisuals()
@@ -150,15 +176,30 @@ namespace EliminateGame.Pattern
                 return;
             }
 
+            int maxColumnCount = 0;
+            for (int rowIndex = 0; rowIndex < patternRows.Count; rowIndex++)
+            {
+                if (patternRows[rowIndex].Count > maxColumnCount)
+                {
+                    maxColumnCount = patternRows[rowIndex].Count;
+                }
+            }
+
+            float globalCenterOffset = (maxColumnCount - 1) * tileSpacing * 0.5f;
+
             for (int rowIndex = 0; rowIndex < patternRows.Count; rowIndex++)
             {
                 List<PatternCell> row = patternRows[rowIndex];
-                float startOffsetX = (row.Count - 1) * tileSpacing * 0.5f;
-                float y = (patternRows.Count - 1 - rowIndex) * tileSpacing;
+                float y = rowIndex * tileSpacing;
 
                 for (int colIndex = 0; colIndex < row.Count; colIndex++)
                 {
                     BlockColor color = row[colIndex].Color;
+                    if (color == BlockColor.None)
+                    {
+                        continue;
+                    }
+
                     SpriteRenderer renderer = CreateTileRenderer(root, color);
                     if (renderer == null)
                     {
@@ -166,11 +207,12 @@ namespace EliminateGame.Pattern
                     }
 
                     Transform tileTransform = renderer.transform;
-                    tileTransform.localPosition = new Vector3((colIndex * tileSpacing) - startOffsetX, y, 0f);
+                    float x = (colIndex * tileSpacing) - globalCenterOffset;
+                    tileTransform.localPosition = new Vector3(x, y, 0f);
                     tileTransform.localRotation = Quaternion.identity;
                     tileTransform.localScale = GetCompensatedVisualScale(tileTransform.parent);
 
-                    renderer.sortingOrder = sortingOrderBase + ((patternRows.Count - 1 - rowIndex) * sortingOrderRowStride) + colIndex;
+                    renderer.sortingOrder = sortingOrderBase + (rowIndex * sortingOrderRowStride) + colIndex;
 
                     tileVisuals.Add(new TileVisualEntry
                     {
