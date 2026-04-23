@@ -7,7 +7,23 @@ namespace EliminateGame.Pattern
 {
     public class PatternController : MonoBehaviour
     {
+        [Header("Pattern Visual")]
+        [SerializeField] private Transform tileRoot;
+        [SerializeField] private GameObject tileVisualPrefab;
+        [SerializeField, Min(0.01f)] private float tileSpacing = 1f;
+        [SerializeField, Min(0.01f)] private float visualScale = 0.95f;
+        [SerializeField] private int sortingOrderBase = 300;
+        [SerializeField, Min(1)] private int sortingOrderRowStride = 20;
+
         private readonly List<List<PatternCell>> patternRows = new List<List<PatternCell>>();
+        private readonly List<TileVisualEntry> tileVisuals = new List<TileVisualEntry>();
+
+        private static Sprite cachedSolidSquareSprite;
+
+        private sealed class TileVisualEntry
+        {
+            public SpriteRenderer Renderer;
+        }
 
         public bool IsEmpty => patternRows.Count == 0;
 
@@ -34,6 +50,7 @@ namespace EliminateGame.Pattern
                 }
             }
 
+            RefreshVisuals();
             Debug.Log($"Pattern initialized. Rows={patternRows.Count}, Bottom=[{string.Join(",", GetBottomRowColors())}]");
         }
 
@@ -88,6 +105,7 @@ namespace EliminateGame.Pattern
                 // Case A: remove all occurrences from Pattern bottom row (left-to-right deterministic).
                 RemoveCellsAtIndices(bottomRow, colorIndices);
                 CollapseIfNeeded();
+                RefreshVisuals();
                 Debug.Log($"Pattern Case A resolved for {color}. Removed={colorIndices.Count} from bottom row.");
                 return PatternResolveResult.CaseA(colorIndices.Count);
             }
@@ -96,6 +114,7 @@ namespace EliminateGame.Pattern
             List<int> firstThree = colorIndices.Take(3).ToList();
             RemoveCellsAtIndices(bottomRow, firstThree);
             CollapseIfNeeded();
+            RefreshVisuals();
             Debug.Log($"Pattern Case B resolved for {color}. Removed=3 from bottom row (left-to-right).");
             return PatternResolveResult.CaseB(3);
         }
@@ -121,6 +140,189 @@ namespace EliminateGame.Pattern
             }
 
             Debug.Log($"Pattern collapse check complete. Rows={patternRows.Count}, Bottom=[{string.Join(",", GetBottomRowColors())}]");
+        }
+
+        private void RefreshVisuals()
+        {
+            ClearAllVisuals();
+
+            Transform root = GetTileRoot();
+            if (root == null)
+            {
+                return;
+            }
+
+            for (int rowIndex = 0; rowIndex < patternRows.Count; rowIndex++)
+            {
+                List<PatternCell> row = patternRows[rowIndex];
+                float startOffsetX = (row.Count - 1) * tileSpacing * 0.5f;
+                float y = (patternRows.Count - 1 - rowIndex) * tileSpacing;
+
+                for (int colIndex = 0; colIndex < row.Count; colIndex++)
+                {
+                    BlockColor color = row[colIndex].Color;
+                    SpriteRenderer renderer = CreateTileRenderer(root, color);
+                    if (renderer == null)
+                    {
+                        continue;
+                    }
+
+                    Transform tileTransform = renderer.transform;
+                    tileTransform.localPosition = new Vector3((colIndex * tileSpacing) - startOffsetX, y, 0f);
+                    tileTransform.localRotation = Quaternion.identity;
+                    tileTransform.localScale = GetCompensatedVisualScale(tileTransform.parent);
+
+                    renderer.sortingOrder = sortingOrderBase + ((patternRows.Count - 1 - rowIndex) * sortingOrderRowStride) + colIndex;
+
+                    tileVisuals.Add(new TileVisualEntry
+                    {
+                        Renderer = renderer
+                    });
+                }
+            }
+        }
+
+        private SpriteRenderer CreateTileRenderer(Transform root, BlockColor color)
+        {
+            GameObject visualObject = null;
+            if (tileVisualPrefab != null)
+            {
+                visualObject = Instantiate(tileVisualPrefab, root);
+            }
+
+            if (visualObject == null)
+            {
+                visualObject = new GameObject("PatternTileVisual");
+                visualObject.transform.SetParent(root, false);
+            }
+
+            visualObject.name = "PatternTileVisual";
+
+            Transform visualTransform = visualObject.transform;
+            visualTransform.SetParent(root, false);
+            visualTransform.localPosition = Vector3.zero;
+            visualTransform.localRotation = Quaternion.identity;
+            visualTransform.localScale = Vector3.one;
+
+            SpriteRenderer renderer = visualObject.GetComponent<SpriteRenderer>();
+            if (renderer == null)
+            {
+                renderer = visualObject.AddComponent<SpriteRenderer>();
+            }
+
+            if (renderer.sprite == null)
+            {
+                renderer.sprite = GetSolidSquareSprite();
+            }
+
+            renderer.drawMode = SpriteDrawMode.Simple;
+            renderer.color = MapColor(color);
+
+            return renderer;
+        }
+
+        private void ClearAllVisuals()
+        {
+            for (int i = 0; i < tileVisuals.Count; i++)
+            {
+                TileVisualEntry entry = tileVisuals[i];
+                if (entry != null && entry.Renderer != null)
+                {
+                    Destroy(entry.Renderer.gameObject);
+                }
+            }
+
+            tileVisuals.Clear();
+
+            Transform root = GetTileRoot();
+            if (root == null)
+            {
+                return;
+            }
+
+            for (int i = root.childCount - 1; i >= 0; i--)
+            {
+                Transform child = root.GetChild(i);
+                if (child != null && child.name == "PatternTileVisual")
+                {
+                    Destroy(child.gameObject);
+                }
+            }
+        }
+
+        private Transform GetTileRoot()
+        {
+            return tileRoot != null ? tileRoot : transform;
+        }
+
+        private static Sprite GetSolidSquareSprite()
+        {
+            if (cachedSolidSquareSprite != null)
+            {
+                return cachedSolidSquareSprite;
+            }
+
+            var texture = new Texture2D(1, 1, TextureFormat.RGBA32, false)
+            {
+                filterMode = FilterMode.Point,
+                wrapMode = TextureWrapMode.Clamp,
+                name = "PatternGeneratedTexture"
+            };
+
+            texture.SetPixel(0, 0, Color.white);
+            texture.Apply();
+
+            cachedSolidSquareSprite = Sprite.Create(
+                texture,
+                new Rect(0f, 0f, 1f, 1f),
+                new Vector2(0.5f, 0.5f),
+                1f);
+            cachedSolidSquareSprite.name = "PatternGeneratedSprite";
+            return cachedSolidSquareSprite;
+        }
+
+        private Vector3 GetCompensatedVisualScale(Transform parent)
+        {
+            Vector3 parentLossyScale = parent != null ? parent.lossyScale : Vector3.one;
+
+            float scaleX = SafeDiv(visualScale, parentLossyScale.x);
+            float scaleY = SafeDiv(visualScale, parentLossyScale.y);
+
+            return new Vector3(scaleX, scaleY, 1f);
+        }
+
+        private static float SafeDiv(float numerator, float denominator)
+        {
+            return Mathf.Abs(denominator) <= 0.0001f ? numerator : numerator / denominator;
+        }
+
+        private static Color MapColor(BlockColor color)
+        {
+            switch (color)
+            {
+                case BlockColor.Red:
+                    return Color.red;
+                case BlockColor.Blue:
+                    return Color.blue;
+                case BlockColor.Green:
+                    return Color.green;
+                case BlockColor.Yellow:
+                    return Color.yellow;
+                case BlockColor.Purple:
+                    return new Color(0.6f, 0.2f, 0.8f);
+                default:
+                    return Color.white;
+            }
+        }
+
+        private void OnDisable()
+        {
+            ClearAllVisuals();
+        }
+
+        private void OnDestroy()
+        {
+            ClearAllVisuals();
         }
     }
 
