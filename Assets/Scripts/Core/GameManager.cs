@@ -112,7 +112,6 @@ namespace EliminateGame.Core
                 return;
             }
 
-            selectionAreaGridController.ConsumeTileAndUnlockCrossNeighbors(tile);
             int tempSlotIndex = tempZoneController.AddTile(tile.Color);
             if (tempSlotIndex < 0)
             {
@@ -120,6 +119,7 @@ namespace EliminateGame.Core
                 return;
             }
 
+            selectionAreaGridController.ConsumeTileAndUnlockCrossNeighbors(tile);
             ResolveImmediatePatternMatch(tile.Color, tempSlotIndex);
             EvaluateStateAfterAction();
         }
