@@ -230,14 +230,21 @@ namespace EliminateGame.TempZone
                 return cachedSolidSquareSprite;
             }
 
-            Texture2D texture = Texture2D.whiteTexture;
+            var texture = new Texture2D(1, 1, TextureFormat.RGBA32, false)
+            {
+                filterMode = FilterMode.Point,
+                wrapMode = TextureWrapMode.Clamp,
+                name = "TempZoneGeneratedTexture"
+            };
+            texture.SetPixel(0, 0, Color.white);
+            texture.Apply();
+
             cachedSolidSquareSprite = Sprite.Create(
                 texture,
-                new Rect(0f, 0f, texture.width, texture.height),
+                new Rect(0f, 0f, 1f, 1f),
                 new Vector2(0.5f, 0.5f),
-                100f,
-                0,
-                SpriteMeshType.FullRect);
+                1f);
+            cachedSolidSquareSprite.name = "TempZoneGeneratedSprite";
             return cachedSolidSquareSprite;
         }
 
