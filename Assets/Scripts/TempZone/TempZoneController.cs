@@ -9,9 +9,13 @@ namespace EliminateGame.TempZone
     public class TempZoneController : MonoBehaviour
     {
         [SerializeField, Min(1)] private int capacity = 7;
+        [SerializeField] private Transform tileRoot;
+        [SerializeField] private SpriteRenderer tileVisualPrefab;
+        [SerializeField] private float spacing = 0.8f;
 
         private readonly List<TempZoneSlot> slots = new List<TempZoneSlot>();
         private readonly Dictionary<BlockColor, int> caseAProgressByColor = new Dictionary<BlockColor, int>();
+        private readonly List<SpriteRenderer> tileVisuals = new List<SpriteRenderer>();
 
         public int Capacity => capacity;
         public int Count => slots.Count;
@@ -23,6 +27,7 @@ namespace EliminateGame.TempZone
             capacity = Mathf.Max(1, newCapacity);
             slots.Clear();
             caseAProgressByColor.Clear();
+            ClearAllVisuals();
             Debug.Log($"Temp Zone initialized. Capacity={capacity}");
         }
 
@@ -36,6 +41,8 @@ namespace EliminateGame.TempZone
 
             slots.Add(new TempZoneSlot(color));
             int index = slots.Count - 1;
+            CreateVisualForColor(color);
+            RefreshVisualPositions();
             Debug.Log($"Temp Zone add: {color} at slot {index}. Count={slots.Count}/{capacity}");
             return index;
         }
@@ -56,11 +63,13 @@ namespace EliminateGame.TempZone
                 }
 
                 slots.RemoveAt(i);
+                RemoveVisualAt(i);
                 removed++;
             }
 
             if (removed > 0)
             {
+                RefreshVisualPositions();
                 Debug.Log($"Temp Zone removed {removed} tile(s) of color {color}. Count={slots.Count}/{capacity}");
             }
 
@@ -114,8 +123,10 @@ namespace EliminateGame.TempZone
                 TempZoneSlot slot = slots[chosenIndex];
                 removed.Add(slot);
                 slots.RemoveAt(chosenIndex);
+                RemoveVisualAt(chosenIndex);
             }
 
+            RefreshVisualPositions();
             Debug.Log($"Temp Zone rescue removed {removed.Count} tile(s). Remaining={slots.Count}/{capacity}");
             return removed;
         }
@@ -153,6 +164,98 @@ namespace EliminateGame.TempZone
             }
 
             return slots.Count - 1;
+        }
+
+        private void CreateVisualForColor(BlockColor color)
+        {
+            if (tileRoot == null || tileVisualPrefab == null)
+            {
+                return;
+            }
+
+            SpriteRenderer visual = Instantiate(tileVisualPrefab, tileRoot);
+            visual.color = MapColor(color);
+            tileVisuals.Add(visual);
+        }
+
+        private void RemoveVisualAt(int index)
+        {
+            if (index < 0 || index >= tileVisuals.Count)
+            {
+                return;
+            }
+
+            SpriteRenderer visual = tileVisuals[index];
+            tileVisuals.RemoveAt(index);
+            if (visual != null)
+            {
+                Destroy(visual.gameObject);
+            }
+        }
+
+        private void RefreshVisualPositions()
+        {
+            for (int i = tileVisuals.Count - 1; i >= 0; i--)
+            {
+                if (tileVisuals[i] == null)
+                {
+                    tileVisuals.RemoveAt(i);
+                }
+            }
+
+            for (int i = 0; i < tileVisuals.Count; i++)
+            {
+                SpriteRenderer visual = tileVisuals[i];
+                if (visual == null)
+                {
+                    continue;
+                }
+
+                visual.transform.localPosition = new Vector3(i * spacing, 0f, 0f);
+            }
+        }
+
+        private void ClearAllVisuals()
+        {
+            for (int i = 0; i < tileVisuals.Count; i++)
+            {
+                SpriteRenderer visual = tileVisuals[i];
+                if (visual != null)
+                {
+                    Destroy(visual.gameObject);
+                }
+            }
+
+            tileVisuals.Clear();
+
+            if (tileRoot == null)
+            {
+                return;
+            }
+
+            for (int i = tileRoot.childCount - 1; i >= 0; i--)
+            {
+                Destroy(tileRoot.GetChild(i).gameObject);
+            }
+        }
+
+        private static Color MapColor(BlockColor color)
+        {
+            switch (color)
+            {
+                case BlockColor.Red:
+                    return Color.red;
+                case BlockColor.Blue:
+                    return Color.blue;
+                case BlockColor.Green:
+                    return Color.green;
+                case BlockColor.Yellow:
+                    return Color.yellow;
+                case BlockColor.Purple:
+                    return new Color(0.6f, 0.2f, 0.8f);
+                default:
+                    return Color.white;
+            }
         }
     }
 }
