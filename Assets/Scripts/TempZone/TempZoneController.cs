@@ -11,11 +11,19 @@ namespace EliminateGame.TempZone
         [SerializeField, Min(1)] private int capacity = 7;
         [SerializeField] private Transform tileRoot;
         [SerializeField] private SpriteRenderer tileVisualPrefab;
-        [SerializeField] private float spacing = 0.8f;
+        [SerializeField] private float spacing = 1.0f;
 
         private readonly List<TempZoneSlot> slots = new List<TempZoneSlot>();
         private readonly Dictionary<BlockColor, int> caseAProgressByColor = new Dictionary<BlockColor, int>();
-        private readonly List<SpriteRenderer> tileVisuals = new List<SpriteRenderer>();
+        private readonly List<TileVisualEntry> tileVisuals = new List<TileVisualEntry>();
+
+        private static Sprite cachedSolidSquareSprite;
+
+        private sealed class TileVisualEntry
+        {
+            public BlockColor Color;
+            public SpriteRenderer Renderer;
+        }
 
         public int Capacity => capacity;
         public int Count => slots.Count;
@@ -86,6 +94,7 @@ namespace EliminateGame.TempZone
             {
                 slots[targetSlotIndex].ProgressMark = next;
                 Debug.Log($"Temp Zone progress mark on slot {targetSlotIndex} ({color}) set to {next}/3.");
+                ApplyProgressVisual(targetSlotIndex, next);
             }
         }
 
@@ -168,14 +177,64 @@ namespace EliminateGame.TempZone
 
         private void CreateVisualForColor(BlockColor color)
         {
-            if (tileRoot == null || tileVisualPrefab == null)
+            Transform root = GetTileRoot();
+            if (root == null)
             {
                 return;
             }
 
-            SpriteRenderer visual = Instantiate(tileVisualPrefab, tileRoot);
-            visual.color = MapColor(color);
-            tileVisuals.Add(visual);
+            SpriteRenderer visual = null;
+
+            if (tileVisualPrefab != null)
+            {
+                visual = Instantiate(tileVisualPrefab, root);
+            }
+
+            if (visual == null)
+            {
+                GameObject visualObject = new GameObject("TempZoneTileVisual");
+                visualObject.transform.SetParent(root, false);
+                visual = visualObject.AddComponent<SpriteRenderer>();
+            }
+
+            ForceSolidSquareStyle(visual, color);
+
+            tileVisuals.Add(new TileVisualEntry
+            {
+                Color = color,
+                Renderer = visual
+            });
+        }
+
+        private void ForceSolidSquareStyle(SpriteRenderer renderer, BlockColor color)
+        {
+            if (renderer == null)
+            {
+                return;
+            }
+
+            renderer.sprite = GetSolidSquareSprite();
+            renderer.drawMode = SpriteDrawMode.Simple;
+            renderer.color = MapColor(color);
+            renderer.transform.localScale = new Vector3(0.95f, 0.95f, 1f);
+        }
+
+        private static Sprite GetSolidSquareSprite()
+        {
+            if (cachedSolidSquareSprite != null)
+            {
+                return cachedSolidSquareSprite;
+            }
+
+            Texture2D texture = Texture2D.whiteTexture;
+            cachedSolidSquareSprite = Sprite.Create(
+                texture,
+                new Rect(0f, 0f, texture.width, texture.height),
+                new Vector2(0.5f, 0.5f),
+                100f,
+                0,
+                SpriteMeshType.FullRect);
+            return cachedSolidSquareSprite;
         }
 
         private void RemoveVisualAt(int index)
@@ -185,11 +244,11 @@ namespace EliminateGame.TempZone
                 return;
             }
 
-            SpriteRenderer visual = tileVisuals[index];
+            TileVisualEntry entry = tileVisuals[index];
             tileVisuals.RemoveAt(index);
-            if (visual != null)
+            if (entry != null && entry.Renderer != null)
             {
-                Destroy(visual.gameObject);
+                Destroy(entry.Renderer.gameObject);
             }
         }
 
@@ -197,21 +256,57 @@ namespace EliminateGame.TempZone
         {
             for (int i = tileVisuals.Count - 1; i >= 0; i--)
             {
-                if (tileVisuals[i] == null)
+                if (tileVisuals[i] == null || tileVisuals[i].Renderer == null)
                 {
                     tileVisuals.RemoveAt(i);
                 }
             }
 
+            float startOffset = (tileVisuals.Count - 1) * spacing * 0.5f;
+
             for (int i = 0; i < tileVisuals.Count; i++)
             {
-                SpriteRenderer visual = tileVisuals[i];
-                if (visual == null)
+                TileVisualEntry entry = tileVisuals[i];
+                SpriteRenderer renderer = entry.Renderer;
+                if (renderer == null)
                 {
                     continue;
                 }
 
-                visual.transform.localPosition = new Vector3(i * spacing, 0f, 0f);
+                renderer.transform.localPosition = new Vector3((i * spacing) - startOffset, 0f, 0f);
+                renderer.transform.localScale = new Vector3(0.95f, 0.95f, 1f);
+
+                int progress = i < slots.Count ? slots[i].ProgressMark : 0;
+                renderer.color = ApplyProgressShade(MapColor(entry.Color), progress);
+            }
+        }
+
+        private void ApplyProgressVisual(int index, int progressMark)
+        {
+            if (index < 0 || index >= tileVisuals.Count)
+            {
+                return;
+            }
+
+            TileVisualEntry entry = tileVisuals[index];
+            if (entry == null || entry.Renderer == null)
+            {
+                return;
+            }
+
+            entry.Renderer.color = ApplyProgressShade(MapColor(entry.Color), progressMark);
+        }
+
+        private static Color ApplyProgressShade(Color baseColor, int progressMark)
+        {
+            switch (progressMark)
+            {
+                case 1:
+                    return baseColor * 0.9f;
+                case 2:
+                    return baseColor * 0.8f;
+                default:
+                    return baseColor;
             }
         }
 
@@ -219,24 +314,30 @@ namespace EliminateGame.TempZone
         {
             for (int i = 0; i < tileVisuals.Count; i++)
             {
-                SpriteRenderer visual = tileVisuals[i];
-                if (visual != null)
+                TileVisualEntry entry = tileVisuals[i];
+                if (entry != null && entry.Renderer != null)
                 {
-                    Destroy(visual.gameObject);
+                    Destroy(entry.Renderer.gameObject);
                 }
             }
 
             tileVisuals.Clear();
 
-            if (tileRoot == null)
+            Transform root = GetTileRoot();
+            if (root == null)
             {
                 return;
             }
 
-            for (int i = tileRoot.childCount - 1; i >= 0; i--)
+            for (int i = root.childCount - 1; i >= 0; i--)
             {
-                Destroy(tileRoot.GetChild(i).gameObject);
+                Destroy(root.GetChild(i).gameObject);
             }
+        }
+
+        private Transform GetTileRoot()
+        {
+            return tileRoot != null ? tileRoot : transform;
         }
 
         private static Color MapColor(BlockColor color)
