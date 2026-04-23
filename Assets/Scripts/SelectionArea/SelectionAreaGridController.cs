@@ -10,7 +10,7 @@ namespace EliminateGame.SelectionArea
     {
         [SerializeField] private SelectionTile tilePrefab;
         [SerializeField] private Transform tileRoot;
-        [SerializeField] private float spacing = 1.1f;
+        [SerializeField] private float spacing = 1.0f;
 
         private readonly Dictionary<Vector2Int, SelectionTile> tiles = new Dictionary<Vector2Int, SelectionTile>();
 
@@ -20,6 +20,14 @@ namespace EliminateGame.SelectionArea
         {
             ClearExistingTiles();
 
+            var validDefinitions = new List<GameConfig.SelectionTileDefinition>();
+            var seenPositions = new HashSet<Vector2Int>();
+
+            int minX = int.MaxValue;
+            int maxX = int.MinValue;
+            int minY = int.MaxValue;
+            int maxY = int.MinValue;
+
             foreach (GameConfig.SelectionTileDefinition definition in config.SelectionTiles)
             {
                 if (definition.Color == BlockColor.None)
@@ -28,14 +36,36 @@ namespace EliminateGame.SelectionArea
                 }
 
                 Vector2Int key = new Vector2Int(definition.X, definition.Y);
-                if (tiles.ContainsKey(key))
+                if (!seenPositions.Add(key))
                 {
                     Debug.LogWarning($"Duplicate Selection Area tile definition at {key}. Skipping duplicate.");
                     continue;
                 }
 
-                var tile = Instantiate(tilePrefab, tileRoot != null ? tileRoot : transform);
-                tile.transform.localPosition = new Vector3(definition.X * spacing, definition.Y * spacing, 0f);
+                validDefinitions.Add(definition);
+
+                if (definition.X < minX) minX = definition.X;
+                if (definition.X > maxX) maxX = definition.X;
+                if (definition.Y < minY) minY = definition.Y;
+                if (definition.Y > maxY) maxY = definition.Y;
+            }
+
+            Vector3 centerOffset = Vector3.zero;
+            if (validDefinitions.Count > 0)
+            {
+                float centerX = (minX + maxX) * 0.5f * spacing;
+                float centerY = -(minY + maxY) * 0.5f * spacing;
+                centerOffset = new Vector3(centerX, centerY, 0f);
+            }
+
+            Transform parent = tileRoot != null ? tileRoot : transform;
+
+            foreach (GameConfig.SelectionTileDefinition definition in validDefinitions)
+            {
+                Vector2Int key = new Vector2Int(definition.X, definition.Y);
+
+                var tile = Instantiate(tilePrefab, parent);
+                tile.transform.localPosition = new Vector3(definition.X * spacing, -definition.Y * spacing, 0f) - centerOffset;
                 tile.Initialize(definition.X, definition.Y, definition.Color, definition.StartUnlocked);
                 tile.Clicked += HandleTileClicked;
                 tiles.Add(key, tile);
