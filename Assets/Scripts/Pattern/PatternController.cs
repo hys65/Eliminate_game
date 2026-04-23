@@ -7,15 +7,23 @@ namespace EliminateGame.Pattern
 {
     public class PatternController : MonoBehaviour
     {
-        [Header("Visual")]
+        [Header("Pattern Visual")]
         [SerializeField] private Transform tileRoot;
         [SerializeField] private GameObject tileVisualPrefab;
-        [SerializeField] private float spacing = 1.0f;
+        [SerializeField, Min(0.01f)] private float tileSpacing = 1f;
+        [SerializeField, Min(0.01f)] private float visualScale = 0.95f;
+        [SerializeField] private int sortingOrderBase = 300;
+        [SerializeField, Min(1)] private int sortingOrderRowStride = 20;
 
         private readonly List<List<PatternCell>> patternRows = new List<List<PatternCell>>();
-        private readonly List<SpriteRenderer> tileVisuals = new List<SpriteRenderer>();
+        private readonly List<TileVisualEntry> tileVisuals = new List<TileVisualEntry>();
 
         private static Sprite cachedSolidSquareSprite;
+
+        private sealed class TileVisualEntry
+        {
+            public SpriteRenderer Renderer;
+        }
 
         public bool IsEmpty => patternRows.Count == 0;
 
@@ -44,7 +52,6 @@ namespace EliminateGame.Pattern
             }
 
             RefreshVisuals();
-
             Debug.Log($"Pattern initialized. Rows={patternRows.Count}, Bottom=[{string.Join(",", GetBottomRowColors())}]");
         }
 
@@ -99,7 +106,6 @@ namespace EliminateGame.Pattern
                 RemoveCellsAtIndices(bottomRow, colorIndices);
                 CollapseIfNeeded();
                 RefreshVisuals();
-
                 Debug.Log($"Pattern Case A resolved for {color}. Removed={colorIndices.Count} from bottom row.");
                 return PatternResolveResult.CaseA(colorIndices.Count);
             }
@@ -108,7 +114,6 @@ namespace EliminateGame.Pattern
             RemoveCellsAtIndices(bottomRow, firstThree);
             CollapseIfNeeded();
             RefreshVisuals();
-
             Debug.Log($"Pattern Case B resolved for {color}. Removed=3 from bottom row (left-to-right).");
             return PatternResolveResult.CaseB(3);
         }
@@ -145,43 +150,39 @@ namespace EliminateGame.Pattern
                 return;
             }
 
-            if (patternRows.Count == 0)
-            {
-                return;
-            }
-
             for (int rowIndex = 0; rowIndex < patternRows.Count; rowIndex++)
             {
                 List<PatternCell> row = patternRows[rowIndex];
-                float startOffsetX = (row.Count - 1) * spacing * 0.5f;
-                float localY = -rowIndex * spacing;
+                float startOffsetX = (row.Count - 1) * tileSpacing * 0.5f;
+                float y = (patternRows.Count - 1 - rowIndex) * tileSpacing;
 
-                for (int columnIndex = 0; columnIndex < row.Count; columnIndex++)
+                for (int colIndex = 0; colIndex < row.Count; colIndex++)
                 {
-                    PatternCell cell = row[columnIndex];
-                    SpriteRenderer renderer = CreateVisualForColor(cell.Color, rowIndex, columnIndex);
+                    BlockColor color = row[colIndex].Color;
+                    SpriteRenderer renderer = CreateTileRenderer(root, color);
                     if (renderer == null)
                     {
                         continue;
                     }
 
-                    renderer.transform.localPosition = new Vector3((columnIndex * spacing) - startOffsetX, localY, 0f);
-                    renderer.transform.localScale = new Vector3(0.95f, 0.95f, 1f);
-                    tileVisuals.Add(renderer);
+                    Transform tileTransform = renderer.transform;
+                    tileTransform.localPosition = new Vector3((colIndex * tileSpacing) - startOffsetX, y, 0f);
+                    tileTransform.localRotation = Quaternion.identity;
+                    tileTransform.localScale = GetCompensatedVisualScale(tileTransform.parent);
+
+                    renderer.sortingOrder = sortingOrderBase + ((patternRows.Count - 1 - rowIndex) * sortingOrderRowStride) + colIndex;
+
+                    tileVisuals.Add(new TileVisualEntry
+                    {
+                        Renderer = renderer
+                    });
                 }
             }
         }
 
-        private SpriteRenderer CreateVisualForColor(BlockColor color, int rowIndex, int columnIndex)
+        private SpriteRenderer CreateTileRenderer(Transform root, BlockColor color)
         {
-            Transform root = GetTileRoot();
-            if (root == null)
-            {
-                return null;
-            }
-
             GameObject visualObject = null;
-
             if (tileVisualPrefab != null)
             {
                 visualObject = Instantiate(tileVisualPrefab, root);
@@ -189,13 +190,17 @@ namespace EliminateGame.Pattern
 
             if (visualObject == null)
             {
-                visualObject = new GameObject($"PatternTile_{rowIndex}_{columnIndex}_{color}");
+                visualObject = new GameObject("PatternTileVisual");
                 visualObject.transform.SetParent(root, false);
             }
-            else
-            {
-                visualObject.name = $"PatternTile_{rowIndex}_{columnIndex}_{color}";
-            }
+
+            visualObject.name = "PatternTileVisual";
+
+            Transform visualTransform = visualObject.transform;
+            visualTransform.SetParent(root, false);
+            visualTransform.localPosition = Vector3.zero;
+            visualTransform.localRotation = Quaternion.identity;
+            visualTransform.localScale = Vector3.one;
 
             SpriteRenderer renderer = visualObject.GetComponent<SpriteRenderer>();
             if (renderer == null)
@@ -203,21 +208,49 @@ namespace EliminateGame.Pattern
                 renderer = visualObject.AddComponent<SpriteRenderer>();
             }
 
-            ForceSolidSquareStyle(renderer, color);
+            if (renderer.sprite == null)
+            {
+                renderer.sprite = GetSolidSquareSprite();
+            }
+
+            renderer.drawMode = SpriteDrawMode.Simple;
+            renderer.color = MapColor(color);
+
             return renderer;
         }
 
-        private void ForceSolidSquareStyle(SpriteRenderer renderer, BlockColor color)
+        private void ClearAllVisuals()
         {
-            if (renderer == null)
+            for (int i = 0; i < tileVisuals.Count; i++)
+            {
+                TileVisualEntry entry = tileVisuals[i];
+                if (entry != null && entry.Renderer != null)
+                {
+                    Destroy(entry.Renderer.gameObject);
+                }
+            }
+
+            tileVisuals.Clear();
+
+            Transform root = GetTileRoot();
+            if (root == null)
             {
                 return;
             }
 
-            renderer.sprite = GetSolidSquareSprite();
-            renderer.drawMode = SpriteDrawMode.Simple;
-            renderer.color = MapColor(color);
-            renderer.transform.localScale = new Vector3(0.95f, 0.95f, 1f);
+            for (int i = root.childCount - 1; i >= 0; i--)
+            {
+                Transform child = root.GetChild(i);
+                if (child != null && child.name == "PatternTileVisual")
+                {
+                    Destroy(child.gameObject);
+                }
+            }
+        }
+
+        private Transform GetTileRoot()
+        {
+            return tileRoot != null ? tileRoot : transform;
         }
 
         private static Sprite GetSolidSquareSprite()
@@ -242,38 +275,23 @@ namespace EliminateGame.Pattern
                 new Rect(0f, 0f, 1f, 1f),
                 new Vector2(0.5f, 0.5f),
                 1f);
-
             cachedSolidSquareSprite.name = "PatternGeneratedSprite";
             return cachedSolidSquareSprite;
         }
 
-        private void ClearAllVisuals()
+        private Vector3 GetCompensatedVisualScale(Transform parent)
         {
-            for (int i = 0; i < tileVisuals.Count; i++)
-            {
-                if (tileVisuals[i] != null)
-                {
-                    Destroy(tileVisuals[i].gameObject);
-                }
-            }
+            Vector3 parentLossyScale = parent != null ? parent.lossyScale : Vector3.one;
 
-            tileVisuals.Clear();
+            float scaleX = SafeDiv(visualScale, parentLossyScale.x);
+            float scaleY = SafeDiv(visualScale, parentLossyScale.y);
 
-            Transform root = GetTileRoot();
-            if (root == null)
-            {
-                return;
-            }
-
-            for (int i = root.childCount - 1; i >= 0; i--)
-            {
-                Destroy(root.GetChild(i).gameObject);
-            }
+            return new Vector3(scaleX, scaleY, 1f);
         }
 
-        private Transform GetTileRoot()
+        private static float SafeDiv(float numerator, float denominator)
         {
-            return tileRoot != null ? tileRoot : transform;
+            return Mathf.Abs(denominator) <= 0.0001f ? numerator : numerator / denominator;
         }
 
         private static Color MapColor(BlockColor color)
