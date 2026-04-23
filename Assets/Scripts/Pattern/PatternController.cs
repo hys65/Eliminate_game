@@ -25,7 +25,7 @@ namespace EliminateGame.Pattern
             public SpriteRenderer Renderer;
         }
 
-        public bool IsEmpty => patternRows.Count == 0;
+        public bool IsEmpty => GetBottomRowIndex() < 0;
 
         public void Initialize(IReadOnlyList<IReadOnlyList<BlockColor>> rows)
         {
@@ -190,7 +190,7 @@ namespace EliminateGame.Pattern
             for (int rowIndex = 0; rowIndex < patternRows.Count; rowIndex++)
             {
                 List<PatternCell> row = patternRows[rowIndex];
-                float y = rowIndex * tileSpacing;
+                float y = (patternRows.Count - 1 - rowIndex) * tileSpacing;
 
                 for (int colIndex = 0; colIndex < row.Count; colIndex++)
                 {
@@ -212,7 +212,7 @@ namespace EliminateGame.Pattern
                     tileTransform.localRotation = Quaternion.identity;
                     tileTransform.localScale = GetCompensatedVisualScale(tileTransform.parent);
 
-                    renderer.sortingOrder = sortingOrderBase + (rowIndex * sortingOrderRowStride) + colIndex;
+                    renderer.sortingOrder = sortingOrderBase + ((patternRows.Count - 1 - rowIndex) * sortingOrderRowStride) + colIndex;
 
                     tileVisuals.Add(new TileVisualEntry
                     {
