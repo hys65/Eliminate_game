@@ -10,7 +10,7 @@ namespace EliminateGame.TempZone
     {
         [SerializeField, Min(1)] private int capacity = 7;
         [SerializeField] private Transform tileRoot;
-        [SerializeField] private SpriteRenderer tileVisualPrefab;
+        [SerializeField] private GameObject tileVisualPrefab;
         [SerializeField] private float spacing = 1.0f;
 
         private readonly List<TempZoneSlot> slots = new List<TempZoneSlot>();
@@ -183,17 +183,21 @@ namespace EliminateGame.TempZone
                 return;
             }
 
-            SpriteRenderer visual = null;
-
+            GameObject visualObject = null;
             if (tileVisualPrefab != null)
             {
-                visual = Instantiate(tileVisualPrefab, root);
+                visualObject = Instantiate(tileVisualPrefab, root);
             }
 
+            if (visualObject == null)
+            {
+                visualObject = new GameObject("TempZoneTileVisual");
+                visualObject.transform.SetParent(root, false);
+            }
+
+            SpriteRenderer visual = visualObject.GetComponent<SpriteRenderer>();
             if (visual == null)
             {
-                GameObject visualObject = new GameObject("TempZoneTileVisual");
-                visualObject.transform.SetParent(root, false);
                 visual = visualObject.AddComponent<SpriteRenderer>();
             }
 
