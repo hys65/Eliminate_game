@@ -387,7 +387,7 @@ MonoBehaviour:
   capacity: 7
   tileRoot: {fileID: 1655432769}
   tileVisualPrefab: {fileID: 7831999506286979535, guid: ccbe5f992717d9e43b5742ee2559c93b, type: 3}
-  spacing: 0.8
+  spacing: 0.6
 --- !u!1 &619394800
 GameObject:
   m_ObjectHideFlags: 0
