@@ -34,6 +34,7 @@ namespace EliminateGame.Pattern
             foreach (IReadOnlyList<BlockColor> row in rows)
             {
                 var builtRow = new List<PatternCell>();
+
                 foreach (BlockColor color in row)
                 {
                     if (color == BlockColor.None)
@@ -102,7 +103,6 @@ namespace EliminateGame.Pattern
 
             if (colorIndices.Count < 3)
             {
-                // Case A: remove all occurrences from Pattern bottom row (left-to-right deterministic).
                 RemoveCellsAtIndices(bottomRow, colorIndices);
                 CollapseIfNeeded();
                 RefreshVisuals();
@@ -110,7 +110,6 @@ namespace EliminateGame.Pattern
                 return PatternResolveResult.CaseA(colorIndices.Count);
             }
 
-            // Case B: remove exactly 3 occurrences, deterministic left-to-right.
             List<int> firstThree = colorIndices.Take(3).ToList();
             RemoveCellsAtIndices(bottomRow, firstThree);
             CollapseIfNeeded();
@@ -130,7 +129,6 @@ namespace EliminateGame.Pattern
 
         private void CollapseIfNeeded()
         {
-            // Conceptual fall-down: remove empty rows so rows above become the new bottom.
             for (int i = patternRows.Count - 1; i >= 0; i--)
             {
                 if (patternRows[i].Count == 0)
@@ -340,9 +338,7 @@ namespace EliminateGame.Pattern
         }
 
         public static PatternResolveResult NoMatch() => new PatternResolveResult(false, false, 0);
-
         public static PatternResolveResult CaseA(int removed) => new PatternResolveResult(true, true, removed);
-
         public static PatternResolveResult CaseB(int removed) => new PatternResolveResult(true, false, removed);
     }
 }
