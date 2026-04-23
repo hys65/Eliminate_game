@@ -17,6 +17,8 @@ namespace EliminateGame.TempZone
         private readonly Dictionary<BlockColor, int> caseAProgressByColor = new Dictionary<BlockColor, int>();
         private readonly List<TileVisualEntry> tileVisuals = new List<TileVisualEntry>();
 
+        private static Sprite cachedSolidSquareSprite;
+
         private sealed class TileVisualEntry
         {
             public BlockColor Color;
@@ -176,20 +178,63 @@ namespace EliminateGame.TempZone
         private void CreateVisualForColor(BlockColor color)
         {
             Transform root = GetTileRoot();
-            if (root == null || tileVisualPrefab == null)
+            if (root == null)
             {
                 return;
             }
 
-            SpriteRenderer visual = Instantiate(tileVisualPrefab, root);
-            visual.color = MapColor(color);
-            visual.transform.localScale = new Vector3(0.95f, 0.95f, 1f);
+            SpriteRenderer visual = null;
+
+            if (tileVisualPrefab != null)
+            {
+                visual = Instantiate(tileVisualPrefab, root);
+            }
+
+            if (visual == null)
+            {
+                GameObject visualObject = new GameObject("TempZoneTileVisual");
+                visualObject.transform.SetParent(root, false);
+                visual = visualObject.AddComponent<SpriteRenderer>();
+            }
+
+            ForceSolidSquareStyle(visual, color);
 
             tileVisuals.Add(new TileVisualEntry
             {
                 Color = color,
                 Renderer = visual
             });
+        }
+
+        private void ForceSolidSquareStyle(SpriteRenderer renderer, BlockColor color)
+        {
+            if (renderer == null)
+            {
+                return;
+            }
+
+            renderer.sprite = GetSolidSquareSprite();
+            renderer.drawMode = SpriteDrawMode.Simple;
+            renderer.color = MapColor(color);
+            renderer.transform.localScale = new Vector3(0.95f, 0.95f, 1f);
+        }
+
+        private static Sprite GetSolidSquareSprite()
+        {
+            if (cachedSolidSquareSprite != null)
+            {
+                return cachedSolidSquareSprite;
+            }
+
+            Texture2D texture = Texture2D.whiteTexture;
+            cachedSolidSquareSprite = Sprite.Create(
+                texture,
+                new Rect(0f, 0f, texture.width, texture.height),
+                new Vector2(0.5f, 0.5f),
+                100f,
+                0,
+                SpriteMeshType.FullRect);
+            return cachedSolidSquareSprite;
         }
 
         private void RemoveVisualAt(int index)
@@ -221,7 +266,8 @@ namespace EliminateGame.TempZone
 
             for (int i = 0; i < tileVisuals.Count; i++)
             {
-                SpriteRenderer renderer = tileVisuals[i].Renderer;
+                TileVisualEntry entry = tileVisuals[i];
+                SpriteRenderer renderer = entry.Renderer;
                 if (renderer == null)
                 {
                     continue;
@@ -231,7 +277,7 @@ namespace EliminateGame.TempZone
                 renderer.transform.localScale = new Vector3(0.95f, 0.95f, 1f);
 
                 int progress = i < slots.Count ? slots[i].ProgressMark : 0;
-                renderer.color = ApplyProgressShade(MapColor(tileVisuals[i].Color), progress);
+                renderer.color = ApplyProgressShade(MapColor(entry.Color), progress);
             }
         }
 
