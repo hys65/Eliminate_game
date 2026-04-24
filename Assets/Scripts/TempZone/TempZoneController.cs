@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using EliminateGame.Pattern;
+using TMPro;
 using UnityEngine;
 
 namespace EliminateGame.TempZone
@@ -23,6 +24,7 @@ namespace EliminateGame.TempZone
         {
             public BlockColor Color;
             public SpriteRenderer Renderer;
+            public TextMeshPro ProgressText;
         }
 
         public int Capacity => capacity;
@@ -206,8 +208,12 @@ namespace EliminateGame.TempZone
             tileVisuals.Add(new TileVisualEntry
             {
                 Color = color,
-                Renderer = visual
+                Renderer = visual,
+                ProgressText = GetOrCreateProgressText(visualObject)
             });
+
+            int progress = slots.Count > 0 ? slots[slots.Count - 1].ProgressMark : 0;
+            UpdateProgressText(tileVisuals[tileVisuals.Count - 1], progress);
         }
 
         private void ForceSolidSquareStyle(SpriteRenderer renderer, BlockColor color)
@@ -289,6 +295,7 @@ namespace EliminateGame.TempZone
 
                 int progress = i < slots.Count ? slots[i].ProgressMark : 0;
                 renderer.color = ApplyProgressShade(MapColor(entry.Color), progress);
+                UpdateProgressText(entry, progress);
             }
         }
 
@@ -306,6 +313,46 @@ namespace EliminateGame.TempZone
             }
 
             entry.Renderer.color = ApplyProgressShade(MapColor(entry.Color), progressMark);
+            UpdateProgressText(entry, progressMark);
+        }
+
+        private static TextMeshPro GetOrCreateProgressText(GameObject visualObject)
+        {
+            if (visualObject == null)
+            {
+                return null;
+            }
+
+            TextMeshPro text = visualObject.GetComponentInChildren<TextMeshPro>();
+            if (text != null)
+            {
+                return text;
+            }
+
+            var textObject = new GameObject("ProgressText");
+            textObject.transform.SetParent(visualObject.transform, false);
+            textObject.transform.localPosition = new Vector3(0f, 0f, -0.1f);
+
+            text = textObject.AddComponent<TextMeshPro>();
+            text.fontSize = 2.6f;
+            text.alignment = TextAlignmentOptions.Center;
+            text.color = Color.black;
+            text.outlineWidth = 0.15f;
+            text.outlineColor = Color.white;
+            text.text = "0/3";
+            text.sortingOrder = 10;
+            return text;
+        }
+
+        private static void UpdateProgressText(TileVisualEntry entry, int progressMark)
+        {
+            if (entry == null || entry.ProgressText == null)
+            {
+                return;
+            }
+
+            int clamped = Mathf.Clamp(progressMark, 0, 3);
+            entry.ProgressText.text = $"{clamped}/3";
         }
 
         private static Color ApplyProgressShade(Color baseColor, int progressMark)
