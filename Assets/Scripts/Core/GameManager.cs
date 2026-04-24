@@ -18,6 +18,9 @@ namespace EliminateGame.Core
         [SerializeField] private TempZoneController tempZoneController;
         [SerializeField] private SelectionAreaGridController selectionAreaGridController;
 
+        [Header("Safety")]
+        [SerializeField, Min(1)] private int autoResolveSafetyLimit = 128;
+
         [Header("Debug")]
         [SerializeField] private int rescueRandomSeed = 12345;
 
@@ -120,27 +123,52 @@ namespace EliminateGame.Core
             }
 
             selectionAreaGridController.ConsumeTileAndUnlockCrossNeighbors(tile);
-            ResolveImmediatePatternMatch(tile.Color, tempSlotIndex);
+            ResolvePatternUsingTempZoneChain(tile.Color, tempSlotIndex);
             EvaluateStateAfterAction();
         }
 
-        private void ResolveImmediatePatternMatch(BlockColor selectedColor, int tempSlotIndex)
+        private void ResolvePatternUsingTempZoneChain(BlockColor selectedColor, int tempSlotIndex)
+        {
+            ResolveAgainstTempSlot(selectedColor, tempSlotIndex);
+
+            int iterationLimit = Mathf.Max(1, autoResolveSafetyLimit);
+            for (int iteration = 0; iteration < iterationLimit; iteration++)
+            {
+                IReadOnlyList<BlockColor> bottomRowColors = patternController.GetBottomRowColors();
+                if (bottomRowColors.Count == 0)
+                {
+                    break;
+                }
+
+                if (!tempZoneController.TryFindMatchingSlot(bottomRowColors, out int matchingSlotIndex, out BlockColor matchingColor))
+                {
+                    break;
+                }
+
+                bool resolved = ResolveAgainstTempSlot(matchingColor, matchingSlotIndex);
+                if (!resolved)
+                {
+                    break;
+                }
+            }
+        }
+
+        private bool ResolveAgainstTempSlot(BlockColor selectedColor, int tempSlotIndex)
         {
             PatternResolveResult result = patternController.ResolveAgainstBottomRow(selectedColor);
             if (!result.Matched)
             {
-                return;
+                return false;
             }
 
             if (result.IsCaseA)
             {
-                // Case A: keep tile in Temp Zone, only mark progress as 1/3 or 2/3.
-                tempZoneController.MarkCaseAProgress(selectedColor, tempSlotIndex, result.PatternRemovedCount);
-                return;
+                tempZoneController.ApplyCaseAProgress(tempSlotIndex, result.PatternRemovedCount);
+                return true;
             }
 
-            // Case B: remove 3 matching tiles from Temp Zone.
             tempZoneController.RemoveByColor(selectedColor, 3);
+            return true;
         }
 
         private void EvaluateStateAfterAction()

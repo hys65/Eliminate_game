@@ -15,7 +15,6 @@ namespace EliminateGame.TempZone
         [SerializeField] private float spacing = 1.0f;
 
         private readonly List<TempZoneSlot> slots = new List<TempZoneSlot>();
-        private readonly Dictionary<BlockColor, int> caseAProgressByColor = new Dictionary<BlockColor, int>();
         private readonly List<TileVisualEntry> tileVisuals = new List<TileVisualEntry>();
 
         private static Sprite cachedSolidSquareSprite;
@@ -36,7 +35,6 @@ namespace EliminateGame.TempZone
         {
             capacity = Mathf.Max(1, newCapacity);
             slots.Clear();
-            caseAProgressByColor.Clear();
             ClearAllVisuals();
             Debug.Log($"Temp Zone initialized. Capacity={capacity}");
         }
@@ -60,6 +58,25 @@ namespace EliminateGame.TempZone
         public bool ContainsColor(BlockColor color)
         {
             return slots.Any(slot => slot.Color == color);
+        }
+
+        public bool TryFindMatchingSlot(IReadOnlyCollection<BlockColor> bottomRowColors, out int slotIndex, out BlockColor color)
+        {
+            for (int i = 0; i < slots.Count; i++)
+            {
+                if (!bottomRowColors.Contains(slots[i].Color))
+                {
+                    continue;
+                }
+
+                slotIndex = i;
+                color = slots[i].Color;
+                return true;
+            }
+
+            slotIndex = -1;
+            color = BlockColor.None;
+            return false;
         }
 
         public int RemoveByColor(BlockColor color, int removeCount)
@@ -86,18 +103,29 @@ namespace EliminateGame.TempZone
             return removed;
         }
 
-        public void MarkCaseAProgress(BlockColor color, int targetSlotIndex, int gainedProgress)
+        public void ApplyCaseAProgress(int targetSlotIndex, int gainedProgress)
         {
-            int previous = caseAProgressByColor.GetValueOrDefault(color, 0);
-            int next = Mathf.Clamp(previous + gainedProgress, 0, 2);
-            caseAProgressByColor[color] = next;
-
-            if (targetSlotIndex >= 0 && targetSlotIndex < slots.Count)
+            if (targetSlotIndex < 0 || targetSlotIndex >= slots.Count || gainedProgress <= 0)
             {
-                slots[targetSlotIndex].ProgressMark = next;
-                Debug.Log($"Temp Zone progress mark on slot {targetSlotIndex} ({color}) set to {next}/3.");
-                ApplyProgressVisual(targetSlotIndex, next);
+                return;
             }
+
+            TempZoneSlot slot = slots[targetSlotIndex];
+            int previous = slot.ProgressMark;
+            slot.IncreaseProgressMark(gainedProgress, 3);
+            int next = slot.ProgressMark;
+
+            Debug.Log($"Temp Zone progress mark on slot {targetSlotIndex} ({slot.Color}) set to {next}/3.");
+
+            if (next >= 3)
+            {
+                BlockColor color = slot.Color;
+                RemoveSlotAt(targetSlotIndex);
+                Debug.Log($"Temp Zone removed slot {targetSlotIndex} ({color}) after reaching 3/3 progress (from {previous}/3 +{gainedProgress}).");
+                return;
+            }
+
+            ApplyProgressVisual(targetSlotIndex, next);
         }
 
         public bool HasAnyColorInSet(IReadOnlyCollection<BlockColor> colorSet)
@@ -140,6 +168,18 @@ namespace EliminateGame.TempZone
             RefreshVisualPositions();
             Debug.Log($"Temp Zone rescue removed {removed.Count} tile(s). Remaining={slots.Count}/{capacity}");
             return removed;
+        }
+
+        private void RemoveSlotAt(int index)
+        {
+            if (index < 0 || index >= slots.Count)
+            {
+                return;
+            }
+
+            slots.RemoveAt(index);
+            RemoveVisualAt(index);
+            RefreshVisualPositions();
         }
 
         private int ChooseWeightedRemovalIndex(IReadOnlyDictionary<BlockColor, int> bottomCounts, System.Random rng)
