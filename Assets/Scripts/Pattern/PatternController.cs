@@ -97,6 +97,7 @@ namespace EliminateGame.Pattern
             if (colorIndices.Count < 3)
             {
                 SetCellsToNone(bottomRow, colorIndices);
+                ApplyColumnGravity();
                 CollapseIfNeeded();
                 RefreshVisuals();
                 Debug.Log($"Pattern Case A resolved for {color}. Removed={colorIndices.Count} from bottom row.");
@@ -105,6 +106,7 @@ namespace EliminateGame.Pattern
 
             List<int> firstThree = colorIndices.Take(3).ToList();
             SetCellsToNone(bottomRow, firstThree);
+            ApplyColumnGravity();
             CollapseIfNeeded();
             RefreshVisuals();
             Debug.Log($"Pattern Case B resolved for {color}. Removed=3 from bottom row (left-to-right).");
@@ -137,6 +139,55 @@ namespace EliminateGame.Pattern
                 {
                     row[index].Color = BlockColor.None;
                 }
+            }
+        }
+
+        private void ApplyColumnGravity()
+        {
+            int maxColumnCount = 0;
+            for (int rowIndex = 0; rowIndex < patternRows.Count; rowIndex++)
+            {
+                if (patternRows[rowIndex].Count > maxColumnCount)
+                {
+                    maxColumnCount = patternRows[rowIndex].Count;
+                }
+            }
+
+            for (int colIndex = 0; colIndex < maxColumnCount; colIndex++)
+            {
+                bool moved;
+                do
+                {
+                    moved = false;
+
+                    for (int rowIndex = patternRows.Count - 1; rowIndex >= 0; rowIndex--)
+                    {
+                        List<PatternCell> row = patternRows[rowIndex];
+                        if (colIndex >= row.Count || row[colIndex].Color != BlockColor.None)
+                        {
+                            continue;
+                        }
+
+                        for (int aboveRowIndex = rowIndex - 1; aboveRowIndex >= 0; aboveRowIndex--)
+                        {
+                            List<PatternCell> aboveRow = patternRows[aboveRowIndex];
+                            if (colIndex >= aboveRow.Count)
+                            {
+                                continue;
+                            }
+
+                            if (aboveRow[colIndex].Color == BlockColor.None)
+                            {
+                                continue;
+                            }
+
+                            row[colIndex].Color = aboveRow[colIndex].Color;
+                            aboveRow[colIndex].Color = BlockColor.None;
+                            moved = true;
+                            break;
+                        }
+                    }
+                } while (moved);
             }
         }
 
