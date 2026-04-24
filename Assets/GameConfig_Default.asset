@@ -37,15 +37,15 @@ MonoBehaviour:
   - X: 0
     Y: 1
     Color: 5
-    StartUnlocked: 1
+    StartUnlocked: 0
   - X: 1
     Y: 1
     Color: 1
-    StartUnlocked: 1
+    StartUnlocked: 0
   - X: 2
     Y: 1
     Color: 4
-    StartUnlocked: 1
+    StartUnlocked: 0
   - X: 0
     Y: 2
     Color: 1
