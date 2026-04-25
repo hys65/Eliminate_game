@@ -524,7 +524,8 @@ MonoBehaviour:
   visualScale: 0.95
   sortingOrderBase: 300
   sortingOrderRowStride: 20
-  fallDuration: 1
+  fallDuration: 0.5
+  ghostDuration: 0.12
 --- !u!1 &890418633
 GameObject:
   m_ObjectHideFlags: 0
