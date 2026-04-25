@@ -17,7 +17,8 @@ namespace EliminateGame.Pattern
 
         [Header("Pattern Fall Animation")]
         [SerializeField, Min(0.15f)] private float fallDuration = 0.2f;
-        [SerializeField] private Vector2 spawnOffsetRange = new Vector2(2f, 4f);
+        [SerializeField, Min(1f)] private float minColumnSpawnRows = 4f;
+        [SerializeField, Min(0f)] private float perColumnDelay = 0.02f;
 
         private readonly SCG.List<SCG.List<PatternCell>> patternRows = new SCG.List<SCG.List<PatternCell>>();
         private readonly SCG.List<TileVisualEntry> tileVisuals = new SCG.List<TileVisualEntry>();
@@ -30,6 +31,7 @@ namespace EliminateGame.Pattern
             public SpriteRenderer Renderer;
             public Vector3 StartLocalPosition;
             public Vector3 TargetLocalPosition;
+            public int ColumnIndex;
         }
 
         public bool IsEmpty => GetBottomRowIndex() < 0;
@@ -296,10 +298,10 @@ namespace EliminateGame.Pattern
                         continue;
                     }
 
-                    float x = (colIndex * tileSpacing) - globalCenterOffset;
-                    Vector3 targetLocalPosition = new Vector3(x, targetY, 0f);
-                    float spawnOffset = Mathf.Max(0f, UnityEngine.Random.Range(spawnOffsetRange.x, spawnOffsetRange.y));
-                    Vector3 startLocalPosition = new Vector3(x, targetY + spawnOffset, 0f);
+                    float targetX = (colIndex * tileSpacing) - globalCenterOffset;
+                    Vector3 targetLocalPosition = new Vector3(targetX, targetY, 0f);
+                    float columnSpawnOffset = GetColumnSpawnOffset(colIndex);
+                    Vector3 startLocalPosition = new Vector3(targetX, targetY + columnSpawnOffset, 0f);
                     int sortingOrder = sortingOrderBase + ((patternRows.Count - 1 - rowIndex) * sortingOrderRowStride) + colIndex;
 
                     SpriteRenderer renderer = CreateTileRenderer(root, color);
@@ -318,7 +320,8 @@ namespace EliminateGame.Pattern
                     {
                         Renderer = renderer,
                         StartLocalPosition = startLocalPosition,
-                        TargetLocalPosition = targetLocalPosition
+                        TargetLocalPosition = targetLocalPosition,
+                        ColumnIndex = colIndex
                     });
                 }
             }
@@ -329,16 +332,47 @@ namespace EliminateGame.Pattern
             }
         }
 
+        private float GetColumnSpawnOffset(int colIndex)
+        {
+            int columnHeight = 0;
+            for (int rowIndex = 0; rowIndex < patternRows.Count; rowIndex++)
+            {
+                if (!TryGetCell(rowIndex, colIndex, out PatternCell cell))
+                {
+                    continue;
+                }
+
+                if (cell.Color != BlockColor.None)
+                {
+                    columnHeight++;
+                }
+            }
+
+            float spawnRows = Mathf.Max(minColumnSpawnRows, columnHeight);
+            return spawnRows * tileSpacing;
+        }
+
         private System.Collections.IEnumerator AnimateTileFallCoroutine()
         {
             float duration = Mathf.Clamp(fallDuration, 0.15f, 0.25f);
+            float columnDelay = Mathf.Max(0f, perColumnDelay);
+            int maxColumnIndex = 0;
+
+            for (int i = 0; i < tileVisuals.Count; i++)
+            {
+                TileVisualEntry entry = tileVisuals[i];
+                if (entry != null && entry.ColumnIndex > maxColumnIndex)
+                {
+                    maxColumnIndex = entry.ColumnIndex;
+                }
+            }
+
+            float totalDuration = duration + (maxColumnIndex * columnDelay);
             float elapsed = 0f;
 
-            while (elapsed < duration)
+            while (elapsed < totalDuration)
             {
                 elapsed += Time.deltaTime;
-                float t = Mathf.Clamp01(elapsed / duration);
-                float eased = t * t * (3f - 2f * t);
 
                 for (int i = 0; i < tileVisuals.Count; i++)
                 {
@@ -348,6 +382,9 @@ namespace EliminateGame.Pattern
                         continue;
                     }
 
+                    float startDelay = entry.ColumnIndex * columnDelay;
+                    float normalized = Mathf.Clamp01((elapsed - startDelay) / duration);
+                    float eased = normalized * normalized * (3f - 2f * normalized);
                     entry.Renderer.transform.localPosition = Vector3.LerpUnclamped(entry.StartLocalPosition, entry.TargetLocalPosition, eased);
                 }
 
