@@ -65,6 +65,9 @@ namespace EliminateGame.Pattern
             public SpriteRenderer Renderer;
             public Vector3 TargetLocalPosition;
             public int SortingOrder;
+            public int ColumnIndex;
+            public int RowIndex;
+            public BlockColor LogicalColor;
         }
 
         public bool IsEmpty => GetBottomRowIndex() < 0;
@@ -403,6 +406,9 @@ namespace EliminateGame.Pattern
 
                     entry.SortingOrder = sortingOrder;
                     entry.TargetLocalPosition = targetLocalPosition;
+                    entry.ColumnIndex = colIndex;
+                    entry.RowIndex = rowIndex;
+                    entry.LogicalColor = color;
                     entry.Renderer.sortingOrder = sortingOrder;
                     tileVisuals.Add(entry);
                 }
@@ -433,67 +439,8 @@ namespace EliminateGame.Pattern
         private Dictionary<TileStableKey, Queue<TileVisualEntry>> CaptureCurrentVisualsByKey()
         {
             var result = new Dictionary<TileStableKey, Queue<TileVisualEntry>>();
-            var occurrenceCounters = new Dictionary<(int Column, BlockColor Color), int>();
 
-            int maxColumnCount = 0;
-            for (int rowIndex = 0; rowIndex < patternRows.Count; rowIndex++)
-            {
-                if (patternRows[rowIndex].Count > maxColumnCount)
-                {
-                    maxColumnCount = patternRows[rowIndex].Count;
-                }
-            }
-
-            float globalCenterOffset = (maxColumnCount - 1) * tileSpacing * 0.5f;
-
-            for (int rowIndex = 0; rowIndex < patternRows.Count; rowIndex++)
-            {
-                List<PatternCell> row = patternRows[rowIndex];
-                float y = (patternRows.Count - 1 - rowIndex) * tileSpacing;
-
-                for (int colIndex = 0; colIndex < row.Count; colIndex++)
-                {
-                    BlockColor color = row[colIndex].Color;
-                    if (color == BlockColor.None)
-                    {
-                        continue;
-                    }
-
-                    float x = (colIndex * tileSpacing) - globalCenterOffset;
-                    Vector3 expectedPosition = new Vector3(x, y, 0f);
-                    TileVisualEntry matched = FindAndTakeClosestVisual(color, expectedPosition);
-                    if (matched == null || matched.Renderer == null)
-                    {
-                        continue;
-                    }
-
-                    var occurrenceKey = (Column: colIndex, Color: color);
-                    if (!occurrenceCounters.TryGetValue(occurrenceKey, out int occurrence))
-                    {
-                        occurrence = 0;
-                    }
-
-                    occurrenceCounters[occurrenceKey] = occurrence + 1;
-                    TileStableKey stableKey = new TileStableKey(colIndex, color, occurrence);
-
-                    if (!result.TryGetValue(stableKey, out Queue<TileVisualEntry> queue))
-                    {
-                        queue = new Queue<TileVisualEntry>();
-                        result.Add(stableKey, queue);
-                    }
-
-                    queue.Enqueue(matched);
-                }
-            }
-
-            return result;
-        }
-
-        private TileVisualEntry FindAndTakeClosestVisual(BlockColor color, Vector3 expectedPosition)
-        {
-            int matchedIndex = -1;
-            float bestDistance = float.MaxValue;
-
+            var groupedEntries = new Dictionary<(int Column, BlockColor Color), List<TileVisualEntry>>();
             for (int i = 0; i < tileVisuals.Count; i++)
             {
                 TileVisualEntry entry = tileVisuals[i];
@@ -502,27 +449,37 @@ namespace EliminateGame.Pattern
                     continue;
                 }
 
-                if (entry.Renderer.color != MapColor(color))
+                var groupKey = (entry.ColumnIndex, entry.LogicalColor);
+                if (!groupedEntries.TryGetValue(groupKey, out List<TileVisualEntry> entries))
                 {
-                    continue;
+                    entries = new List<TileVisualEntry>();
+                    groupedEntries.Add(groupKey, entries);
                 }
 
-                float distance = Vector3.SqrMagnitude(entry.Renderer.transform.localPosition - expectedPosition);
-                if (distance < bestDistance)
-                {
-                    bestDistance = distance;
-                    matchedIndex = i;
-                }
+                entries.Add(entry);
             }
 
-            if (matchedIndex < 0)
+            foreach (KeyValuePair<(int Column, BlockColor Color), List<TileVisualEntry>> pair in groupedEntries)
             {
-                return null;
+                List<TileVisualEntry> entries = pair.Value;
+                entries.Sort((a, b) => a.RowIndex.CompareTo(b.RowIndex));
+
+                for (int occurrence = 0; occurrence < entries.Count; occurrence++)
+                {
+                    TileVisualEntry entry = entries[occurrence];
+                    TileStableKey stableKey = new TileStableKey(pair.Key.Column, pair.Key.Color, occurrence);
+
+                    if (!result.TryGetValue(stableKey, out Queue<TileVisualEntry> queue))
+                    {
+                        queue = new Queue<TileVisualEntry>();
+                        result.Add(stableKey, queue);
+                    }
+
+                    queue.Enqueue(entry);
+                }
             }
 
-            TileVisualEntry matchedEntry = tileVisuals[matchedIndex];
-            tileVisuals.RemoveAt(matchedIndex);
-            return matchedEntry;
+            return result;
         }
 
         private void DestroyRemainingOldVisuals(Dictionary<TileStableKey, Queue<TileVisualEntry>> oldVisualsByKey, List<TileVisualEntry> unmatchedOldVisuals)
