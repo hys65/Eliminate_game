@@ -202,6 +202,7 @@ MonoBehaviour:
   patternController: {fileID: 654914619}
   tempZoneController: {fileID: 535113916}
   selectionAreaGridController: {fileID: 890418635}
+  autoResolveSafetyLimit: 128
   rescueRandomSeed: 12345
 --- !u!1 &519420028
 GameObject:
@@ -523,6 +524,7 @@ MonoBehaviour:
   visualScale: 0.95
   sortingOrderBase: 300
   sortingOrderRowStride: 20
+  fallDuration: 1
 --- !u!1 &890418633
 GameObject:
   m_ObjectHideFlags: 0
