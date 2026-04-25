@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -13,62 +12,13 @@ namespace EliminateGame.Pattern
         [SerializeField] private GameObject tileVisualPrefab;
         [SerializeField, Min(0.01f)] private float tileSpacing = 1f;
         [SerializeField, Min(0.01f)] private float visualScale = 0.95f;
-        [SerializeField, Min(0f)] private float baseFallDuration = 0.08f;
-        [SerializeField, Min(0f)] private float perCellFallTime = 0.06f;
         [SerializeField] private int sortingOrderBase = 300;
         [SerializeField, Min(1)] private int sortingOrderRowStride = 20;
 
         private readonly List<List<PatternCell>> patternRows = new List<List<PatternCell>>();
-        private readonly List<TileVisualEntry> tileVisuals = new List<TileVisualEntry>();
-
-        private Coroutine fallAnimationCoroutine;
+        private readonly List<SpriteRenderer> tileVisuals = new List<SpriteRenderer>();
 
         private static Sprite cachedSolidSquareSprite;
-
-        private readonly struct TileStableKey : IEquatable<TileStableKey>
-        {
-            public readonly int Column;
-            public readonly BlockColor Color;
-            public readonly int Occurrence;
-
-            public TileStableKey(int column, BlockColor color, int occurrence)
-            {
-                Column = column;
-                Color = color;
-                Occurrence = occurrence;
-            }
-
-            public bool Equals(TileStableKey other)
-            {
-                return Column == other.Column && Color == other.Color && Occurrence == other.Occurrence;
-            }
-
-            public override bool Equals(object obj)
-            {
-                return obj is TileStableKey other && Equals(other);
-            }
-
-            public override int GetHashCode()
-            {
-                unchecked
-                {
-                    int hash = Column;
-                    hash = (hash * 397) ^ (int)Color;
-                    hash = (hash * 397) ^ Occurrence;
-                    return hash;
-                }
-            }
-        }
-
-        private sealed class TileVisualEntry
-        {
-            public SpriteRenderer Renderer;
-            public Vector3 TargetLocalPosition;
-            public int SortingOrder;
-            public int ColumnIndex;
-            public int RowIndex;
-            public BlockColor LogicalColor;
-        }
 
         public bool IsEmpty => GetBottomRowIndex() < 0;
 
@@ -88,7 +38,7 @@ namespace EliminateGame.Pattern
                 patternRows.Add(builtRow);
             }
 
-            RefreshVisualsInstant();
+            RefreshVisuals();
             Debug.Log($"Pattern initialized. Rows={patternRows.Count}, Bottom=[{string.Join(",", GetBottomRowColors())}]");
         }
 
@@ -144,7 +94,7 @@ namespace EliminateGame.Pattern
                 SetCellsToNone(bottomRow, colorIndices);
                 ApplyColumnGravity();
                 CollapseIfNeeded();
-                RefreshVisualsWithFallAnimation();
+                RefreshVisuals();
                 Debug.Log($"Pattern Case A resolved for {color}. Removed={colorIndices.Count} from bottom row.");
                 return PatternResolveResult.CaseA(colorIndices.Count);
             }
@@ -153,7 +103,7 @@ namespace EliminateGame.Pattern
             SetCellsToNone(bottomRow, firstThree);
             ApplyColumnGravity();
             CollapseIfNeeded();
-            RefreshVisualsWithFallAnimation();
+            RefreshVisuals();
             Debug.Log($"Pattern Case B resolved for {color}. Removed=3 from bottom row (left-to-right).");
             return PatternResolveResult.CaseB(3);
         }
@@ -294,9 +244,8 @@ namespace EliminateGame.Pattern
             return true;
         }
 
-        private void RefreshVisualsInstant()
+        private void RefreshVisuals()
         {
-            StopFallAnimationIfRunning();
             ClearAllVisuals();
 
             Transform root = GetTileRoot();
@@ -305,38 +254,6 @@ namespace EliminateGame.Pattern
                 return;
             }
 
-            BuildVisuals(root, null);
-        }
-
-        private void RefreshVisualsWithFallAnimation()
-        {
-            StopFallAnimationIfRunning();
-
-            Transform root = GetTileRoot();
-            if (root == null)
-            {
-                ClearAllVisuals();
-                return;
-            }
-
-            Dictionary<TileStableKey, Queue<TileVisualEntry>> oldVisualsByKey = CaptureCurrentVisualsByKey();
-            List<TileVisualEntry> unmatchedOldVisuals = new List<TileVisualEntry>(tileVisuals);
-
-            tileVisuals.Clear();
-            BuildVisuals(root, oldVisualsByKey);
-            DestroyRemainingOldVisuals(oldVisualsByKey, unmatchedOldVisuals);
-
-            if (baseFallDuration <= 0f && perCellFallTime <= 0f)
-            {
-                SnapVisualsToTargetPositions();
-                return;
-            }
-
-            fallAnimationCoroutine = StartCoroutine(AnimateFallCoroutine());
-        }
-
-        private void BuildVisuals(Transform root, Dictionary<TileStableKey, Queue<TileVisualEntry>> oldVisualsByKey)
-        {
             int maxColumnCount = 0;
             for (int rowIndex = 0; rowIndex < patternRows.Count; rowIndex++)
             {
@@ -347,8 +264,6 @@ namespace EliminateGame.Pattern
             }
 
             float globalCenterOffset = (maxColumnCount - 1) * tileSpacing * 0.5f;
-
-            Dictionary<(int Column, BlockColor Color), int> occurrenceCounters = new Dictionary<(int Column, BlockColor Color), int>();
 
             for (int rowIndex = 0; rowIndex < patternRows.Count; rowIndex++)
             {
@@ -363,242 +278,24 @@ namespace EliminateGame.Pattern
                         continue;
                     }
 
-                    var occurrenceKey = (Column: colIndex, Color: color);
-                    if (!occurrenceCounters.TryGetValue(occurrenceKey, out int occurrence))
-                    {
-                        occurrence = 0;
-                    }
-
-                    TileStableKey stableKey = new TileStableKey(colIndex, color, occurrence);
-                    occurrenceCounters[occurrenceKey] = occurrence + 1;
-
                     float x = (colIndex * tileSpacing) - globalCenterOffset;
                     Vector3 targetLocalPosition = new Vector3(x, y, 0f);
                     int sortingOrder = sortingOrderBase + ((patternRows.Count - 1 - rowIndex) * sortingOrderRowStride) + colIndex;
 
-                    TileVisualEntry entry = TryReuseOldVisual(stableKey, oldVisualsByKey);
-                    if (entry == null || entry.Renderer == null)
-                    {
-                        SpriteRenderer renderer = CreateTileRenderer(root, color);
-                        if (renderer == null)
-                        {
-                            continue;
-                        }
-
-                        Transform tileTransform = renderer.transform;
-                        tileTransform.localPosition = targetLocalPosition;
-                        tileTransform.localRotation = Quaternion.identity;
-                        tileTransform.localScale = GetCompensatedVisualScale(tileTransform.parent);
-
-                        entry = new TileVisualEntry
-                        {
-                            Renderer = renderer
-                        };
-                    }
-                    else
-                    {
-                        Transform tileTransform = entry.Renderer.transform;
-                        tileTransform.SetParent(root, false);
-                        tileTransform.localRotation = Quaternion.identity;
-                        tileTransform.localScale = GetCompensatedVisualScale(tileTransform.parent);
-                        entry.Renderer.color = MapColor(color);
-                    }
-
-                    entry.SortingOrder = sortingOrder;
-                    entry.TargetLocalPosition = targetLocalPosition;
-                    entry.ColumnIndex = colIndex;
-                    entry.RowIndex = rowIndex;
-                    entry.LogicalColor = color;
-                    entry.Renderer.sortingOrder = sortingOrder;
-                    tileVisuals.Add(entry);
-                }
-            }
-        }
-
-        private TileVisualEntry TryReuseOldVisual(TileStableKey key, Dictionary<TileStableKey, Queue<TileVisualEntry>> oldVisualsByKey)
-        {
-            if (oldVisualsByKey == null)
-            {
-                return null;
-            }
-
-            if (!oldVisualsByKey.TryGetValue(key, out Queue<TileVisualEntry> queue) || queue.Count == 0)
-            {
-                return null;
-            }
-
-            TileVisualEntry entry = queue.Dequeue();
-            if (entry == null || entry.Renderer == null)
-            {
-                return null;
-            }
-
-            return entry;
-        }
-
-        private Dictionary<TileStableKey, Queue<TileVisualEntry>> CaptureCurrentVisualsByKey()
-        {
-            var result = new Dictionary<TileStableKey, Queue<TileVisualEntry>>();
-
-            var groupedEntries = new Dictionary<(int Column, BlockColor Color), List<TileVisualEntry>>();
-            for (int i = 0; i < tileVisuals.Count; i++)
-            {
-                TileVisualEntry entry = tileVisuals[i];
-                if (entry == null || entry.Renderer == null)
-                {
-                    continue;
-                }
-
-                var groupKey = (entry.ColumnIndex, entry.LogicalColor);
-                if (!groupedEntries.TryGetValue(groupKey, out List<TileVisualEntry> entries))
-                {
-                    entries = new List<TileVisualEntry>();
-                    groupedEntries.Add(groupKey, entries);
-                }
-
-                entries.Add(entry);
-            }
-
-            foreach (KeyValuePair<(int Column, BlockColor Color), List<TileVisualEntry>> pair in groupedEntries)
-            {
-                List<TileVisualEntry> entries = pair.Value;
-                entries.Sort((a, b) => a.RowIndex.CompareTo(b.RowIndex));
-
-                for (int occurrence = 0; occurrence < entries.Count; occurrence++)
-                {
-                    TileVisualEntry entry = entries[occurrence];
-                    TileStableKey stableKey = new TileStableKey(pair.Key.Column, pair.Key.Color, occurrence);
-
-                    if (!result.TryGetValue(stableKey, out Queue<TileVisualEntry> queue))
-                    {
-                        queue = new Queue<TileVisualEntry>();
-                        result.Add(stableKey, queue);
-                    }
-
-                    queue.Enqueue(entry);
-                }
-            }
-
-            return result;
-        }
-
-        private void DestroyRemainingOldVisuals(Dictionary<TileStableKey, Queue<TileVisualEntry>> oldVisualsByKey, List<TileVisualEntry> unmatchedOldVisuals)
-        {
-            if (oldVisualsByKey == null)
-            {
-                return;
-            }
-
-            foreach (KeyValuePair<TileStableKey, Queue<TileVisualEntry>> pair in oldVisualsByKey)
-            {
-                Queue<TileVisualEntry> queue = pair.Value;
-                while (queue.Count > 0)
-                {
-                    TileVisualEntry oldEntry = queue.Dequeue();
-                    if (oldEntry != null && oldEntry.Renderer != null)
-                    {
-                        Destroy(oldEntry.Renderer.gameObject);
-                    }
-                }
-            }
-
-            if (unmatchedOldVisuals == null)
-            {
-                return;
-            }
-
-            for (int i = 0; i < unmatchedOldVisuals.Count; i++)
-            {
-                TileVisualEntry leftover = unmatchedOldVisuals[i];
-                if (leftover != null && leftover.Renderer != null)
-                {
-                    Destroy(leftover.Renderer.gameObject);
-                }
-            }
-        }
-
-        private void SnapVisualsToTargetPositions()
-        {
-            for (int i = 0; i < tileVisuals.Count; i++)
-            {
-                TileVisualEntry entry = tileVisuals[i];
-                if (entry == null || entry.Renderer == null)
-                {
-                    continue;
-                }
-
-                entry.Renderer.transform.localPosition = entry.TargetLocalPosition;
-                entry.Renderer.sortingOrder = entry.SortingOrder;
-            }
-        }
-
-        private IEnumerator AnimateFallCoroutine()
-        {
-            List<Vector3> startPositions = new List<Vector3>(tileVisuals.Count);
-            List<float> durations = new List<float>(tileVisuals.Count);
-            float maxDuration = 0f;
-
-            for (int i = 0; i < tileVisuals.Count; i++)
-            {
-                TileVisualEntry entry = tileVisuals[i];
-                Vector3 startPosition = entry != null && entry.Renderer != null ? entry.Renderer.transform.localPosition : Vector3.zero;
-                startPositions.Add(startPosition);
-                Vector3 targetPosition = entry != null ? entry.TargetLocalPosition : startPosition;
-
-                float distanceInCells = tileSpacing > 0f
-                    ? Mathf.Abs(targetPosition.y - startPosition.y) / tileSpacing
-                    : 0f;
-                float duration = baseFallDuration + (distanceInCells * perCellFallTime);
-                durations.Add(duration);
-
-                if (duration > maxDuration)
-                {
-                    maxDuration = duration;
-                }
-            }
-
-            if (maxDuration <= 0f)
-            {
-                SnapVisualsToTargetPositions();
-                fallAnimationCoroutine = null;
-                yield break;
-            }
-
-            float elapsed = 0f;
-
-            while (elapsed < maxDuration)
-            {
-                elapsed += Time.deltaTime;
-
-                for (int i = 0; i < tileVisuals.Count; i++)
-                {
-                    TileVisualEntry entry = tileVisuals[i];
-                    if (entry == null || entry.Renderer == null)
+                    SpriteRenderer renderer = CreateTileRenderer(root, color);
+                    if (renderer == null)
                     {
                         continue;
                     }
 
-                    float tileDuration = durations[i];
-                    float t = tileDuration <= 0f ? 1f : Mathf.Clamp01(elapsed / tileDuration);
-                    t = t * t * (3f - (2f * t));
+                    Transform tileTransform = renderer.transform;
+                    tileTransform.localPosition = targetLocalPosition;
+                    tileTransform.localRotation = Quaternion.identity;
+                    tileTransform.localScale = GetCompensatedVisualScale(tileTransform.parent);
 
-                    entry.Renderer.transform.localPosition = Vector3.Lerp(startPositions[i], entry.TargetLocalPosition, t);
-                    entry.Renderer.sortingOrder = entry.SortingOrder;
+                    renderer.sortingOrder = sortingOrder;
+                    tileVisuals.Add(renderer);
                 }
-
-                yield return null;
-            }
-
-            SnapVisualsToTargetPositions();
-            fallAnimationCoroutine = null;
-        }
-
-        private void StopFallAnimationIfRunning()
-        {
-            if (fallAnimationCoroutine != null)
-            {
-                StopCoroutine(fallAnimationCoroutine);
-                fallAnimationCoroutine = null;
             }
         }
 
@@ -645,10 +342,10 @@ namespace EliminateGame.Pattern
         {
             for (int i = 0; i < tileVisuals.Count; i++)
             {
-                TileVisualEntry entry = tileVisuals[i];
-                if (entry != null && entry.Renderer != null)
+                SpriteRenderer renderer = tileVisuals[i];
+                if (renderer != null)
                 {
-                    Destroy(entry.Renderer.gameObject);
+                    Destroy(renderer.gameObject);
                 }
             }
 
@@ -737,13 +434,11 @@ namespace EliminateGame.Pattern
 
         private void OnDisable()
         {
-            StopFallAnimationIfRunning();
             ClearAllVisuals();
         }
 
         private void OnDestroy()
         {
-            StopFallAnimationIfRunning();
             ClearAllVisuals();
         }
     }
