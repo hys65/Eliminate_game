@@ -17,7 +17,8 @@ namespace EliminateGame.Pattern
 
         [Header("Pattern Fall Animation")]
         [SerializeField, Min(0.15f)] private float fallDuration = 0.2f;
-        
+        [SerializeField, Min(0.05f)] private float ghostDuration = 0.12f;
+
         private readonly SCG.List<SCG.List<PatternCell>> patternRows = new SCG.List<SCG.List<PatternCell>>();
         private readonly SCG.List<TileVisualEntry> tileVisuals = new SCG.List<TileVisualEntry>();
         private Coroutine fallAnimationCoroutine;
@@ -37,6 +38,13 @@ namespace EliminateGame.Pattern
             public int column;
             public int fromRow;
             public int toRow;
+            public BlockColor color;
+        }
+
+        private struct RemovedCellInfo
+        {
+            public int row;
+            public int column;
             public BlockColor color;
         }
 
@@ -111,21 +119,53 @@ namespace EliminateGame.Pattern
 
             if (colorIndices.Count < 3)
             {
+                SCG.List<RemovedCellInfo> removedCells = CaptureRemovedCells(bottomIndex, bottomRow, colorIndices);
                 SetCellsToNone(bottomRow, colorIndices);
                 SCG.List<GravityMove> caseAGravityMoves = ApplyColumnGravity();
                 CollapseIfNeeded();
                 RefreshVisuals(true, caseAGravityMoves);
+                SpawnGhosts(removedCells);
                 Debug.Log($"Pattern Case A resolved for {color}. Removed={colorIndices.Count} from bottom row.");
                 return PatternResolveResult.CaseA(colorIndices.Count);
             }
 
             SCG.List<int> firstThree = colorIndices.Take(3).ToList();
+            SCG.List<RemovedCellInfo> removedThreeCells = CaptureRemovedCells(bottomIndex, bottomRow, firstThree);
             SetCellsToNone(bottomRow, firstThree);
             SCG.List<GravityMove> caseBGravityMoves = ApplyColumnGravity();
             CollapseIfNeeded();
             RefreshVisuals(true, caseBGravityMoves);
+            SpawnGhosts(removedThreeCells);
             Debug.Log($"Pattern Case B resolved for {color}. Removed=3 from bottom row (left-to-right).");
             return PatternResolveResult.CaseB(3);
+        }
+
+        private static SCG.List<RemovedCellInfo> CaptureRemovedCells(int rowIndex, SCG.List<PatternCell> row, SCG.List<int> indices)
+        {
+            SCG.List<RemovedCellInfo> removedCells = new SCG.List<RemovedCellInfo>(indices.Count);
+            for (int i = 0; i < indices.Count; i++)
+            {
+                int columnIndex = indices[i];
+                if (columnIndex < 0 || columnIndex >= row.Count)
+                {
+                    continue;
+                }
+
+                BlockColor color = row[columnIndex].Color;
+                if (color == BlockColor.None)
+                {
+                    continue;
+                }
+
+                removedCells.Add(new RemovedCellInfo
+                {
+                    row = rowIndex,
+                    column = columnIndex,
+                    color = color
+                });
+            }
+
+            return removedCells;
         }
 
         private int GetBottomRowIndex()
@@ -557,6 +597,8 @@ namespace EliminateGame.Pattern
                 fallAnimationCoroutine = null;
             }
 
+            StopAllGhostAnimations();
+
             ClearAllVisuals();
         }
 
@@ -568,7 +610,130 @@ namespace EliminateGame.Pattern
                 fallAnimationCoroutine = null;
             }
 
+            StopAllGhostAnimations();
+
             ClearAllVisuals();
+        }
+
+        private void SpawnGhosts(SCG.List<RemovedCellInfo> removedCells)
+        {
+            if (removedCells == null || removedCells.Count == 0)
+            {
+                return;
+            }
+
+            Transform root = GetTileRoot();
+            if (root == null)
+            {
+                return;
+            }
+
+            int maxColumnCount = 0;
+            for (int rowIndex = 0; rowIndex < patternRows.Count; rowIndex++)
+            {
+                if (patternRows[rowIndex].Count > maxColumnCount)
+                {
+                    maxColumnCount = patternRows[rowIndex].Count;
+                }
+            }
+
+            for (int i = 0; i < removedCells.Count; i++)
+            {
+                RemovedCellInfo cell = removedCells[i];
+                if (cell.color == BlockColor.None)
+                {
+                    continue;
+                }
+
+                if (cell.column + 1 > maxColumnCount)
+                {
+                    maxColumnCount = cell.column + 1;
+                }
+            }
+
+            float globalCenterOffset = (maxColumnCount - 1) * tileSpacing * 0.5f;
+            int preResolveRowCount = patternRows.Count;
+            for (int i = 0; i < removedCells.Count; i++)
+            {
+                RemovedCellInfo cell = removedCells[i];
+                if (cell.row + 1 > preResolveRowCount)
+                {
+                    preResolveRowCount = cell.row + 1;
+                }
+            }
+
+            for (int i = 0; i < removedCells.Count; i++)
+            {
+                RemovedCellInfo cell = removedCells[i];
+                SpriteRenderer renderer = CreateTileRenderer(root, cell.color);
+                if (renderer == null)
+                {
+                    continue;
+                }
+
+                renderer.gameObject.name = "PatternGhostVisual";
+                float x = (cell.column * tileSpacing) - globalCenterOffset;
+                float y = (preResolveRowCount - 1 - cell.row) * tileSpacing;
+                renderer.transform.localPosition = new Vector3(x, y, 0f);
+                renderer.transform.localRotation = Quaternion.identity;
+                renderer.transform.localScale = GetCompensatedVisualScale(renderer.transform.parent);
+                renderer.sortingOrder = sortingOrderBase + (preResolveRowCount * sortingOrderRowStride) + cell.column;
+
+                StartCoroutine(AnimateGhostCoroutine(renderer));
+            }
+        }
+
+        private System.Collections.IEnumerator AnimateGhostCoroutine(SpriteRenderer ghostRenderer)
+        {
+            if (ghostRenderer == null)
+            {
+                yield break;
+            }
+
+            float duration = Mathf.Max(0.05f, ghostDuration);
+            float elapsed = 0f;
+            Vector3 startScale = ghostRenderer.transform.localScale;
+            Color startColor = ghostRenderer.color;
+            Color transparentColor = new Color(startColor.r, startColor.g, startColor.b, 0f);
+
+            while (elapsed < duration)
+            {
+                if (ghostRenderer == null)
+                {
+                    yield break;
+                }
+
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / duration);
+                ghostRenderer.transform.localScale = Vector3.LerpUnclamped(startScale, Vector3.zero, t);
+                ghostRenderer.color = Color.LerpUnclamped(startColor, transparentColor, t);
+                yield return null;
+            }
+
+            if (ghostRenderer != null)
+            {
+                ghostRenderer.transform.localScale = Vector3.zero;
+                ghostRenderer.color = transparentColor;
+                Destroy(ghostRenderer.gameObject);
+            }
+        }
+
+        private void StopAllGhostAnimations()
+        {
+            Transform root = GetTileRoot();
+            if (root == null)
+            {
+                return;
+            }
+
+            for (int i = root.childCount - 1; i >= 0; i--)
+            {
+                Transform child = root.GetChild(i);
+                if (child != null && child.name == "PatternGhostVisual")
+                {
+                    Destroy(child.gameObject);
+                }
+            }
         }
     }
 
