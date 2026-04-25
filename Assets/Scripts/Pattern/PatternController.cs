@@ -17,9 +17,7 @@ namespace EliminateGame.Pattern
 
         [Header("Pattern Fall Animation")]
         [SerializeField, Min(0.15f)] private float fallDuration = 0.2f;
-        [SerializeField, Min(1f)] private float minColumnSpawnRows = 4f;
-        [SerializeField, Min(0f)] private float perColumnDelay = 0.02f;
-
+        
         private readonly SCG.List<SCG.List<PatternCell>> patternRows = new SCG.List<SCG.List<PatternCell>>();
         private readonly SCG.List<TileVisualEntry> tileVisuals = new SCG.List<TileVisualEntry>();
         private Coroutine fallAnimationCoroutine;
@@ -31,7 +29,15 @@ namespace EliminateGame.Pattern
             public SpriteRenderer Renderer;
             public Vector3 StartLocalPosition;
             public Vector3 TargetLocalPosition;
-            public int ColumnIndex;
+            public bool ShouldAnimate;
+        }
+
+        private struct GravityMove
+        {
+            public int column;
+            public int fromRow;
+            public int toRow;
+            public BlockColor color;
         }
 
         public bool IsEmpty => GetBottomRowIndex() < 0;
@@ -106,18 +112,18 @@ namespace EliminateGame.Pattern
             if (colorIndices.Count < 3)
             {
                 SetCellsToNone(bottomRow, colorIndices);
-                ApplyColumnGravity();
+                SCG.List<GravityMove> gravityMoves = ApplyColumnGravity();
                 CollapseIfNeeded();
-                RefreshVisuals(true);
+                RefreshVisuals(true, gravityMoves);
                 Debug.Log($"Pattern Case A resolved for {color}. Removed={colorIndices.Count} from bottom row.");
                 return PatternResolveResult.CaseA(colorIndices.Count);
             }
 
             SCG.List<int> firstThree = colorIndices.Take(3).ToList();
             SetCellsToNone(bottomRow, firstThree);
-            ApplyColumnGravity();
+            SCG.List<GravityMove> gravityMoves = ApplyColumnGravity();
             CollapseIfNeeded();
-            RefreshVisuals(true);
+            RefreshVisuals(true, gravityMoves);
             Debug.Log($"Pattern Case B resolved for {color}. Removed=3 from bottom row (left-to-right).");
             return PatternResolveResult.CaseB(3);
         }
@@ -151,8 +157,9 @@ namespace EliminateGame.Pattern
             }
         }
 
-        private void ApplyColumnGravity()
+        private SCG.List<GravityMove> ApplyColumnGravity()
         {
+            SCG.List<GravityMove> gravityMoves = new SCG.List<GravityMove>();
             int maxColumnCount = 0;
             for (int rowIndex = 0; rowIndex < patternRows.Count; rowIndex++)
             {
@@ -188,12 +195,22 @@ namespace EliminateGame.Pattern
                         }
 
                         PatternCell sourceCell = patternRows[sourceRowIndex][colIndex];
-                        targetCell.Color = sourceCell.Color;
+                        BlockColor movedColor = sourceCell.Color;
+                        targetCell.Color = movedColor;
                         sourceCell.Color = BlockColor.None;
+                        gravityMoves.Add(new GravityMove
+                        {
+                            column = colIndex,
+                            fromRow = sourceRowIndex,
+                            toRow = rowIndex,
+                            color = movedColor
+                        });
                         moved = true;
                     }
                 } while (moved);
             }
+
+            return gravityMoves;
         }
 
         private bool TryGetCell(int rowIndex, int colIndex, out PatternCell cell)
@@ -258,7 +275,7 @@ namespace EliminateGame.Pattern
             return true;
         }
 
-        private void RefreshVisuals(bool animateFall)
+        private void RefreshVisuals(bool animateFall, SCG.List<GravityMove> gravityMoves = null)
         {
             if (fallAnimationCoroutine != null)
             {
@@ -300,9 +317,17 @@ namespace EliminateGame.Pattern
 
                     float targetX = (colIndex * tileSpacing) - globalCenterOffset;
                     Vector3 targetLocalPosition = new Vector3(targetX, targetY, 0f);
-                    float columnSpawnOffset = GetColumnSpawnOffset(colIndex);
-                    Vector3 startLocalPosition = new Vector3(targetX, targetY + columnSpawnOffset, 0f);
                     int sortingOrder = sortingOrderBase + ((patternRows.Count - 1 - rowIndex) * sortingOrderRowStride) + colIndex;
+
+                    bool shouldAnimate = false;
+                    Vector3 startLocalPosition = targetLocalPosition;
+
+                    if (animateFall && TryFindGravityMove(gravityMoves, colIndex, rowIndex, color, out GravityMove gravityMove))
+                    {
+                        float startY = (patternRows.Count - 1 - gravityMove.fromRow) * tileSpacing;
+                        startLocalPosition = new Vector3(targetX, startY, 0f);
+                        shouldAnimate = true;
+                    }
 
                     SpriteRenderer renderer = CreateTileRenderer(root, color);
                     if (renderer == null)
@@ -311,7 +336,7 @@ namespace EliminateGame.Pattern
                     }
 
                     Transform tileTransform = renderer.transform;
-                    tileTransform.localPosition = animateFall ? startLocalPosition : targetLocalPosition;
+                    tileTransform.localPosition = shouldAnimate ? startLocalPosition : targetLocalPosition;
                     tileTransform.localRotation = Quaternion.identity;
                     tileTransform.localScale = GetCompensatedVisualScale(tileTransform.parent);
                     renderer.sortingOrder = sortingOrder;
@@ -321,7 +346,7 @@ namespace EliminateGame.Pattern
                         Renderer = renderer,
                         StartLocalPosition = startLocalPosition,
                         TargetLocalPosition = targetLocalPosition,
-                        ColumnIndex = colIndex
+                        ShouldAnimate = shouldAnimate
                     });
                 }
             }
@@ -332,59 +357,45 @@ namespace EliminateGame.Pattern
             }
         }
 
-        private float GetColumnSpawnOffset(int colIndex)
+        private static bool TryFindGravityMove(SCG.List<GravityMove> gravityMoves, int column, int toRow, BlockColor color, out GravityMove gravityMove)
         {
-            int columnHeight = 0;
-            for (int rowIndex = 0; rowIndex < patternRows.Count; rowIndex++)
+            if (gravityMoves != null)
             {
-                if (!TryGetCell(rowIndex, colIndex, out PatternCell cell))
+                for (int i = 0; i < gravityMoves.Count; i++)
                 {
-                    continue;
-                }
-
-                if (cell.Color != BlockColor.None)
-                {
-                    columnHeight++;
+                    GravityMove candidate = gravityMoves[i];
+                    if (candidate.column == column && candidate.toRow == toRow && candidate.color == color)
+                    {
+                        gravityMove = candidate;
+                        gravityMoves.RemoveAt(i);
+                        return true;
+                    }
                 }
             }
 
-            float spawnRows = Mathf.Max(minColumnSpawnRows, columnHeight);
-            return spawnRows * tileSpacing;
+            gravityMove = default;
+            return false;
         }
 
         private System.Collections.IEnumerator AnimateTileFallCoroutine()
         {
-            float duration = Mathf.Clamp(fallDuration, 0.15f, 0.25f);
-            float columnDelay = Mathf.Max(0f, perColumnDelay);
-            int maxColumnIndex = 0;
-
-            for (int i = 0; i < tileVisuals.Count; i++)
-            {
-                TileVisualEntry entry = tileVisuals[i];
-                if (entry != null && entry.ColumnIndex > maxColumnIndex)
-                {
-                    maxColumnIndex = entry.ColumnIndex;
-                }
-            }
-
-            float totalDuration = duration + (maxColumnIndex * columnDelay);
+            float duration = Mathf.Clamp(fallDuration, 0.18f, 0.25f);
             float elapsed = 0f;
 
-            while (elapsed < totalDuration)
+            while (elapsed < duration)
             {
                 elapsed += Time.deltaTime;
+                float normalized = Mathf.Clamp01(elapsed / duration);
+                float eased = normalized * normalized * (3f - 2f * normalized);
 
                 for (int i = 0; i < tileVisuals.Count; i++)
                 {
                     TileVisualEntry entry = tileVisuals[i];
-                    if (entry == null || entry.Renderer == null)
+                    if (entry == null || entry.Renderer == null || !entry.ShouldAnimate)
                     {
                         continue;
                     }
 
-                    float startDelay = entry.ColumnIndex * columnDelay;
-                    float normalized = Mathf.Clamp01((elapsed - startDelay) / duration);
-                    float eased = normalized * normalized * (3f - 2f * normalized);
                     entry.Renderer.transform.localPosition = Vector3.LerpUnclamped(entry.StartLocalPosition, entry.TargetLocalPosition, eased);
                 }
 
@@ -394,7 +405,7 @@ namespace EliminateGame.Pattern
             for (int i = 0; i < tileVisuals.Count; i++)
             {
                 TileVisualEntry entry = tileVisuals[i];
-                if (entry == null || entry.Renderer == null)
+                if (entry == null || entry.Renderer == null || !entry.ShouldAnimate)
                 {
                     continue;
                 }
