@@ -1,5 +1,5 @@
 using System;
-using SCG = System.C\u006fllections.Generic;
+using SCG = System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
@@ -15,14 +15,21 @@ namespace EliminateGame.Pattern
         [SerializeField] private int sortingOrderBase = 300;
         [SerializeField, Min(1)] private int sortingOrderRowStride = 20;
 
+        [Header("Pattern Fall Animation")]
+        [SerializeField, Min(0.15f)] private float fallDuration = 0.2f;
+        [SerializeField] private Vector2 spawnOffsetRange = new Vector2(2f, 4f);
+
         private readonly SCG.List<SCG.List<PatternCell>> patternRows = new SCG.List<SCG.List<PatternCell>>();
         private readonly SCG.List<TileVisualEntry> tileVisuals = new SCG.List<TileVisualEntry>();
+        private Coroutine fallAnimationCoroutine;
 
         private static Sprite cachedSolidSquareSprite;
 
         private sealed class TileVisualEntry
         {
             public SpriteRenderer Renderer;
+            public Vector3 StartLocalPosition;
+            public Vector3 TargetLocalPosition;
         }
 
         public bool IsEmpty => GetBottomRowIndex() < 0;
@@ -43,7 +50,7 @@ namespace EliminateGame.Pattern
                 patternRows.Add(builtRow);
             }
 
-            RefreshVisuals();
+            RefreshVisuals(false);
             Debug.Log($"Pattern initialized. Rows={patternRows.Count}, Bottom=[{string.Join(",", GetBottomRowColors())}]");
         }
 
@@ -99,7 +106,7 @@ namespace EliminateGame.Pattern
                 SetCellsToNone(bottomRow, colorIndices);
                 ApplyColumnGravity();
                 CollapseIfNeeded();
-                RefreshVisuals();
+                RefreshVisuals(true);
                 Debug.Log($"Pattern Case A resolved for {color}. Removed={colorIndices.Count} from bottom row.");
                 return PatternResolveResult.CaseA(colorIndices.Count);
             }
@@ -108,7 +115,7 @@ namespace EliminateGame.Pattern
             SetCellsToNone(bottomRow, firstThree);
             ApplyColumnGravity();
             CollapseIfNeeded();
-            RefreshVisuals();
+            RefreshVisuals(true);
             Debug.Log($"Pattern Case B resolved for {color}. Removed=3 from bottom row (left-to-right).");
             return PatternResolveResult.CaseB(3);
         }
@@ -249,8 +256,14 @@ namespace EliminateGame.Pattern
             return true;
         }
 
-        private void RefreshVisuals()
+        private void RefreshVisuals(bool animateFall)
         {
+            if (fallAnimationCoroutine != null)
+            {
+                StopCoroutine(fallAnimationCoroutine);
+                fallAnimationCoroutine = null;
+            }
+
             ClearAllVisuals();
 
             Transform root = GetTileRoot();
@@ -273,7 +286,7 @@ namespace EliminateGame.Pattern
             for (int rowIndex = 0; rowIndex < patternRows.Count; rowIndex++)
             {
                 SCG.List<PatternCell> row = patternRows[rowIndex];
-                float y = (patternRows.Count - 1 - rowIndex) * tileSpacing;
+                float targetY = (patternRows.Count - 1 - rowIndex) * tileSpacing;
 
                 for (int colIndex = 0; colIndex < row.Count; colIndex++)
                 {
@@ -284,7 +297,9 @@ namespace EliminateGame.Pattern
                     }
 
                     float x = (colIndex * tileSpacing) - globalCenterOffset;
-                    Vector3 localPosition = new Vector3(x, y, 0f);
+                    Vector3 targetLocalPosition = new Vector3(x, targetY, 0f);
+                    float spawnOffset = Mathf.Max(0f, UnityEngine.Random.Range(spawnOffsetRange.x, spawnOffsetRange.y));
+                    Vector3 startLocalPosition = new Vector3(x, targetY + spawnOffset, 0f);
                     int sortingOrder = sortingOrderBase + ((patternRows.Count - 1 - rowIndex) * sortingOrderRowStride) + colIndex;
 
                     SpriteRenderer renderer = CreateTileRenderer(root, color);
@@ -294,17 +309,63 @@ namespace EliminateGame.Pattern
                     }
 
                     Transform tileTransform = renderer.transform;
-                    tileTransform.localPosition = localPosition;
+                    tileTransform.localPosition = animateFall ? startLocalPosition : targetLocalPosition;
                     tileTransform.localRotation = Quaternion.identity;
                     tileTransform.localScale = GetCompensatedVisualScale(tileTransform.parent);
                     renderer.sortingOrder = sortingOrder;
 
                     tileVisuals.Add(new TileVisualEntry
                     {
-                        Renderer = renderer
+                        Renderer = renderer,
+                        StartLocalPosition = startLocalPosition,
+                        TargetLocalPosition = targetLocalPosition
                     });
                 }
             }
+
+            if (animateFall && tileVisuals.Count > 0)
+            {
+                fallAnimationCoroutine = StartCoroutine(AnimateTileFallCoroutine());
+            }
+        }
+
+        private System.Collections.IEnumerator AnimateTileFallCoroutine()
+        {
+            float duration = Mathf.Clamp(fallDuration, 0.15f, 0.25f);
+            float elapsed = 0f;
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / duration);
+                float eased = t * t * (3f - 2f * t);
+
+                for (int i = 0; i < tileVisuals.Count; i++)
+                {
+                    TileVisualEntry entry = tileVisuals[i];
+                    if (entry == null || entry.Renderer == null)
+                    {
+                        continue;
+                    }
+
+                    entry.Renderer.transform.localPosition = Vector3.LerpUnclamped(entry.StartLocalPosition, entry.TargetLocalPosition, eased);
+                }
+
+                yield return null;
+            }
+
+            for (int i = 0; i < tileVisuals.Count; i++)
+            {
+                TileVisualEntry entry = tileVisuals[i];
+                if (entry == null || entry.Renderer == null)
+                {
+                    continue;
+                }
+
+                entry.Renderer.transform.localPosition = entry.TargetLocalPosition;
+            }
+
+            fallAnimationCoroutine = null;
         }
 
         private SpriteRenderer CreateTileRenderer(Transform root, BlockColor color)
@@ -442,11 +503,23 @@ namespace EliminateGame.Pattern
 
         private void OnDisable()
         {
+            if (fallAnimationCoroutine != null)
+            {
+                StopCoroutine(fallAnimationCoroutine);
+                fallAnimationCoroutine = null;
+            }
+
             ClearAllVisuals();
         }
 
         private void OnDestroy()
         {
+            if (fallAnimationCoroutine != null)
+            {
+                StopCoroutine(fallAnimationCoroutine);
+                fallAnimationCoroutine = null;
+            }
+
             ClearAllVisuals();
         }
     }
