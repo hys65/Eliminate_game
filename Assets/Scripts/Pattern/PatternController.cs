@@ -112,18 +112,18 @@ namespace EliminateGame.Pattern
             if (colorIndices.Count < 3)
             {
                 SetCellsToNone(bottomRow, colorIndices);
-                SCG.List<GravityMove> gravityMoves = ApplyColumnGravity();
+                SCG.List<GravityMove> caseAGravityMoves = ApplyColumnGravity();
                 CollapseIfNeeded();
-                RefreshVisuals(true, gravityMoves);
+                RefreshVisuals(true, caseAGravityMoves);
                 Debug.Log($"Pattern Case A resolved for {color}. Removed={colorIndices.Count} from bottom row.");
                 return PatternResolveResult.CaseA(colorIndices.Count);
             }
 
             SCG.List<int> firstThree = colorIndices.Take(3).ToList();
             SetCellsToNone(bottomRow, firstThree);
-            SCG.List<GravityMove> gravityMoves = ApplyColumnGravity();
+            SCG.List<GravityMove> caseBGravityMoves = ApplyColumnGravity();
             CollapseIfNeeded();
-            RefreshVisuals(true, gravityMoves);
+            RefreshVisuals(true, caseBGravityMoves);
             Debug.Log($"Pattern Case B resolved for {color}. Removed=3 from bottom row (left-to-right).");
             return PatternResolveResult.CaseB(3);
         }
