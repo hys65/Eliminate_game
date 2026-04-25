@@ -17,10 +17,12 @@ namespace EliminateGame.Pattern
 
         [Header("Pattern Fall Animation")]
         [SerializeField, Min(0.15f)] private float fallDuration = 0.2f;
+        [SerializeField, Min(0.01f)] private float eliminateFeedbackDuration = 0.12f;
         
         private readonly SCG.List<SCG.List<PatternCell>> patternRows = new SCG.List<SCG.List<PatternCell>>();
         private readonly SCG.List<TileVisualEntry> tileVisuals = new SCG.List<TileVisualEntry>();
         private Coroutine fallAnimationCoroutine;
+        private Coroutine resolveAnimationCoroutine;
 
         private static Sprite cachedSolidSquareSprite;
 
@@ -30,6 +32,16 @@ namespace EliminateGame.Pattern
             public Vector3 StartLocalPosition;
             public Vector3 TargetLocalPosition;
             public bool ShouldAnimate;
+            public int Row;
+            public int Column;
+            public BlockColor Color;
+        }
+
+        private struct RemovedCellInfo
+        {
+            public int row;
+            public int column;
+            public BlockColor color;
         }
 
         private struct GravityMove
@@ -111,21 +123,189 @@ namespace EliminateGame.Pattern
 
             if (colorIndices.Count < 3)
             {
-                SetCellsToNone(bottomRow, colorIndices);
-                SCG.List<GravityMove> caseAGravityMoves = ApplyColumnGravity();
-                CollapseIfNeeded();
-                RefreshVisuals(true, caseAGravityMoves);
+                SCG.List<RemovedCellInfo> removedCells = BuildRemovedCells(bottomIndex, colorIndices);
+                QueueResolveAnimation(removedCells);
                 Debug.Log($"Pattern Case A resolved for {color}. Removed={colorIndices.Count} from bottom row.");
                 return PatternResolveResult.CaseA(colorIndices.Count);
             }
 
             SCG.List<int> firstThree = colorIndices.Take(3).ToList();
-            SetCellsToNone(bottomRow, firstThree);
-            SCG.List<GravityMove> caseBGravityMoves = ApplyColumnGravity();
-            CollapseIfNeeded();
-            RefreshVisuals(true, caseBGravityMoves);
+            SCG.List<RemovedCellInfo> removedFirstThree = BuildRemovedCells(bottomIndex, firstThree);
+            QueueResolveAnimation(removedFirstThree);
             Debug.Log($"Pattern Case B resolved for {color}. Removed=3 from bottom row (left-to-right).");
             return PatternResolveResult.CaseB(3);
+        }
+
+        private SCG.List<RemovedCellInfo> BuildRemovedCells(int rowIndex, SCG.List<int> indices)
+        {
+            SCG.List<RemovedCellInfo> removedCells = new SCG.List<RemovedCellInfo>();
+            for (int i = 0; i < indices.Count; i++)
+            {
+                int columnIndex = indices[i];
+                if (!TryGetCell(rowIndex, columnIndex, out PatternCell cell))
+                {
+                    continue;
+                }
+
+                if (cell.Color == BlockColor.None)
+                {
+                    continue;
+                }
+
+                removedCells.Add(new RemovedCellInfo
+                {
+                    row = rowIndex,
+                    column = columnIndex,
+                    color = cell.Color
+                });
+            }
+
+            return removedCells;
+        }
+
+        private void QueueResolveAnimation(SCG.List<RemovedCellInfo> removedCells)
+        {
+            if (resolveAnimationCoroutine != null)
+            {
+                StopCoroutine(resolveAnimationCoroutine);
+                resolveAnimationCoroutine = null;
+            }
+
+            resolveAnimationCoroutine = StartCoroutine(ResolveWithFeedbackCoroutine(removedCells));
+        }
+
+        private System.Collections.IEnumerator ResolveWithFeedbackCoroutine(SCG.List<RemovedCellInfo> removedCells)
+        {
+            if (fallAnimationCoroutine != null)
+            {
+                StopCoroutine(fallAnimationCoroutine);
+                fallAnimationCoroutine = null;
+                SnapAnimatingTilesToTargets();
+            }
+
+            yield return PlayEliminationFeedbackCoroutine(removedCells);
+            SetRemovedCellsToNone(removedCells);
+            SCG.List<GravityMove> gravityMoves = ApplyColumnGravity();
+            CollapseIfNeeded();
+            RefreshVisuals(true, gravityMoves);
+            resolveAnimationCoroutine = null;
+        }
+
+        private void SnapAnimatingTilesToTargets()
+        {
+            for (int i = 0; i < tileVisuals.Count; i++)
+            {
+                TileVisualEntry entry = tileVisuals[i];
+                if (entry == null || entry.Renderer == null || !entry.ShouldAnimate)
+                {
+                    continue;
+                }
+
+                entry.Renderer.transform.localPosition = entry.TargetLocalPosition;
+            }
+        }
+
+        private System.Collections.IEnumerator PlayEliminationFeedbackCoroutine(SCG.List<RemovedCellInfo> removedCells)
+        {
+            float duration = Mathf.Max(0.01f, eliminateFeedbackDuration);
+            SCG.List<TileVisualEntry> targets = new SCG.List<TileVisualEntry>();
+            SCG.List<Vector3> baseScales = new SCG.List<Vector3>();
+            SCG.List<float> baseAlphas = new SCG.List<float>();
+
+            for (int i = 0; i < removedCells.Count; i++)
+            {
+                RemovedCellInfo removed = removedCells[i];
+                TileVisualEntry visual = FindVisual(removed.row, removed.column, removed.color);
+                if (visual == null || visual.Renderer == null)
+                {
+                    continue;
+                }
+
+                targets.Add(visual);
+                baseScales.Add(visual.Renderer.transform.localScale);
+                baseAlphas.Add(visual.Renderer.color.a);
+            }
+
+            if (targets.Count == 0)
+            {
+                yield break;
+            }
+
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / duration);
+                float scaleFactor = Mathf.LerpUnclamped(1f, 0.7f, t);
+                float alpha = Mathf.LerpUnclamped(1f, 0f, t);
+
+                for (int i = 0; i < targets.Count; i++)
+                {
+                    TileVisualEntry entry = targets[i];
+                    if (entry == null || entry.Renderer == null)
+                    {
+                        continue;
+                    }
+
+                    Transform entryTransform = entry.Renderer.transform;
+                    entryTransform.localScale = baseScales[i] * scaleFactor;
+
+                    Color color = entry.Renderer.color;
+                    color.a = baseAlphas[i] * alpha;
+                    entry.Renderer.color = color;
+                }
+
+                yield return null;
+            }
+
+            for (int i = 0; i < targets.Count; i++)
+            {
+                TileVisualEntry entry = targets[i];
+                if (entry == null || entry.Renderer == null)
+                {
+                    continue;
+                }
+
+                Color color = entry.Renderer.color;
+                color.a = 0f;
+                entry.Renderer.color = color;
+            }
+        }
+
+        private TileVisualEntry FindVisual(int row, int column, BlockColor color)
+        {
+            for (int i = 0; i < tileVisuals.Count; i++)
+            {
+                TileVisualEntry entry = tileVisuals[i];
+                if (entry == null || entry.Renderer == null)
+                {
+                    continue;
+                }
+
+                if (entry.Row == row && entry.Column == column && entry.Color == color)
+                {
+                    return entry;
+                }
+            }
+
+            return null;
+        }
+
+        private void SetRemovedCellsToNone(SCG.List<RemovedCellInfo> removedCells)
+        {
+            for (int i = 0; i < removedCells.Count; i++)
+            {
+                RemovedCellInfo removed = removedCells[i];
+                if (!TryGetCell(removed.row, removed.column, out PatternCell cell))
+                {
+                    continue;
+                }
+
+                if (cell.Color == removed.color)
+                {
+                    cell.Color = BlockColor.None;
+                }
+            }
         }
 
         private int GetBottomRowIndex()
@@ -346,7 +526,10 @@ namespace EliminateGame.Pattern
                         Renderer = renderer,
                         StartLocalPosition = startLocalPosition,
                         TargetLocalPosition = targetLocalPosition,
-                        ShouldAnimate = shouldAnimate
+                        ShouldAnimate = shouldAnimate,
+                        Row = rowIndex,
+                        Column = colIndex,
+                        Color = color
                     });
                 }
             }
@@ -551,6 +734,12 @@ namespace EliminateGame.Pattern
 
         private void OnDisable()
         {
+            if (resolveAnimationCoroutine != null)
+            {
+                StopCoroutine(resolveAnimationCoroutine);
+                resolveAnimationCoroutine = null;
+            }
+
             if (fallAnimationCoroutine != null)
             {
                 StopCoroutine(fallAnimationCoroutine);
@@ -562,6 +751,12 @@ namespace EliminateGame.Pattern
 
         private void OnDestroy()
         {
+            if (resolveAnimationCoroutine != null)
+            {
+                StopCoroutine(resolveAnimationCoroutine);
+                resolveAnimationCoroutine = null;
+            }
+
             if (fallAnimationCoroutine != null)
             {
                 StopCoroutine(fallAnimationCoroutine);
