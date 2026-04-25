@@ -162,33 +162,65 @@ namespace EliminateGame.Pattern
 
                     for (int rowIndex = patternRows.Count - 1; rowIndex >= 0; rowIndex--)
                     {
-                        List<PatternCell> row = patternRows[rowIndex];
-                        if (colIndex >= row.Count || row[colIndex].Color != BlockColor.None)
+                        if (!TryGetCell(rowIndex, colIndex, out PatternCell targetCell))
                         {
                             continue;
                         }
 
-                        for (int aboveRowIndex = rowIndex - 1; aboveRowIndex >= 0; aboveRowIndex--)
+                        if (targetCell.Color != BlockColor.None)
                         {
-                            List<PatternCell> aboveRow = patternRows[aboveRowIndex];
-                            if (colIndex >= aboveRow.Count)
-                            {
-                                continue;
-                            }
-
-                            if (aboveRow[colIndex].Color == BlockColor.None)
-                            {
-                                continue;
-                            }
-
-                            row[colIndex].Color = aboveRow[colIndex].Color;
-                            aboveRow[colIndex].Color = BlockColor.None;
-                            moved = true;
-                            break;
+                            continue;
                         }
+
+                        int sourceRowIndex = FindNearestNonEmptyRowAbove(rowIndex, colIndex);
+                        if (sourceRowIndex < 0)
+                        {
+                            continue;
+                        }
+
+                        PatternCell sourceCell = patternRows[sourceRowIndex][colIndex];
+                        targetCell.Color = sourceCell.Color;
+                        sourceCell.Color = BlockColor.None;
+                        moved = true;
                     }
                 } while (moved);
             }
+        }
+
+        private bool TryGetCell(int rowIndex, int colIndex, out PatternCell cell)
+        {
+            cell = null;
+            if (rowIndex < 0 || rowIndex >= patternRows.Count)
+            {
+                return false;
+            }
+
+            List<PatternCell> row = patternRows[rowIndex];
+            if (colIndex < 0 || colIndex >= row.Count)
+            {
+                return false;
+            }
+
+            cell = row[colIndex];
+            return true;
+        }
+
+        private int FindNearestNonEmptyRowAbove(int rowIndex, int colIndex)
+        {
+            for (int aboveRowIndex = rowIndex - 1; aboveRowIndex >= 0; aboveRowIndex--)
+            {
+                if (!TryGetCell(aboveRowIndex, colIndex, out PatternCell aboveCell))
+                {
+                    continue;
+                }
+
+                if (aboveCell.Color != BlockColor.None)
+                {
+                    return aboveRowIndex;
+                }
+            }
+
+            return -1;
         }
 
         private void CollapseIfNeeded()
