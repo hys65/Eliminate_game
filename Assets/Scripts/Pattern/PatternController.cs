@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -12,17 +13,57 @@ namespace EliminateGame.Pattern
         [SerializeField] private GameObject tileVisualPrefab;
         [SerializeField, Min(0.01f)] private float tileSpacing = 1f;
         [SerializeField, Min(0.01f)] private float visualScale = 0.95f;
+        [SerializeField, Min(0f)] private float fallAnimationDuration = 0.15f;
         [SerializeField] private int sortingOrderBase = 300;
         [SerializeField, Min(1)] private int sortingOrderRowStride = 20;
 
         private readonly List<List<PatternCell>> patternRows = new List<List<PatternCell>>();
         private readonly List<TileVisualEntry> tileVisuals = new List<TileVisualEntry>();
 
+        private Coroutine fallAnimationCoroutine;
+
         private static Sprite cachedSolidSquareSprite;
+
+        private readonly struct TileStableKey : IEquatable<TileStableKey>
+        {
+            public readonly int Column;
+            public readonly BlockColor Color;
+            public readonly int Occurrence;
+
+            public TileStableKey(int column, BlockColor color, int occurrence)
+            {
+                Column = column;
+                Color = color;
+                Occurrence = occurrence;
+            }
+
+            public bool Equals(TileStableKey other)
+            {
+                return Column == other.Column && Color == other.Color && Occurrence == other.Occurrence;
+            }
+
+            public override bool Equals(object obj)
+            {
+                return obj is TileStableKey other && Equals(other);
+            }
+
+            public override int GetHashCode()
+            {
+                unchecked
+                {
+                    int hash = Column;
+                    hash = (hash * 397) ^ (int)Color;
+                    hash = (hash * 397) ^ Occurrence;
+                    return hash;
+                }
+            }
+        }
 
         private sealed class TileVisualEntry
         {
             public SpriteRenderer Renderer;
+            public Vector3 TargetLocalPosition;
+            public int SortingOrder;
         }
 
         public bool IsEmpty => GetBottomRowIndex() < 0;
@@ -43,7 +84,7 @@ namespace EliminateGame.Pattern
                 patternRows.Add(builtRow);
             }
 
-            RefreshVisuals();
+            RefreshVisualsInstant();
             Debug.Log($"Pattern initialized. Rows={patternRows.Count}, Bottom=[{string.Join(",", GetBottomRowColors())}]");
         }
 
@@ -99,7 +140,7 @@ namespace EliminateGame.Pattern
                 SetCellsToNone(bottomRow, colorIndices);
                 ApplyColumnGravity();
                 CollapseIfNeeded();
-                RefreshVisuals();
+                RefreshVisualsWithFallAnimation();
                 Debug.Log($"Pattern Case A resolved for {color}. Removed={colorIndices.Count} from bottom row.");
                 return PatternResolveResult.CaseA(colorIndices.Count);
             }
@@ -108,7 +149,7 @@ namespace EliminateGame.Pattern
             SetCellsToNone(bottomRow, firstThree);
             ApplyColumnGravity();
             CollapseIfNeeded();
-            RefreshVisuals();
+            RefreshVisualsWithFallAnimation();
             Debug.Log($"Pattern Case B resolved for {color}. Removed=3 from bottom row (left-to-right).");
             return PatternResolveResult.CaseB(3);
         }
@@ -249,8 +290,9 @@ namespace EliminateGame.Pattern
             return true;
         }
 
-        private void RefreshVisuals()
+        private void RefreshVisualsInstant()
         {
+            StopFallAnimationIfRunning();
             ClearAllVisuals();
 
             Transform root = GetTileRoot();
@@ -258,6 +300,139 @@ namespace EliminateGame.Pattern
             {
                 return;
             }
+
+            BuildVisuals(root, null);
+        }
+
+        private void RefreshVisualsWithFallAnimation()
+        {
+            StopFallAnimationIfRunning();
+
+            Transform root = GetTileRoot();
+            if (root == null)
+            {
+                ClearAllVisuals();
+                return;
+            }
+
+            Dictionary<TileStableKey, Queue<TileVisualEntry>> oldVisualsByKey = CaptureCurrentVisualsByKey();
+            List<TileVisualEntry> unmatchedOldVisuals = new List<TileVisualEntry>(tileVisuals);
+
+            tileVisuals.Clear();
+            BuildVisuals(root, oldVisualsByKey);
+            DestroyRemainingOldVisuals(oldVisualsByKey, unmatchedOldVisuals);
+
+            if (fallAnimationDuration <= 0f)
+            {
+                SnapVisualsToTargetPositions();
+                return;
+            }
+
+            fallAnimationCoroutine = StartCoroutine(AnimateFallCoroutine(fallAnimationDuration));
+        }
+
+        private void BuildVisuals(Transform root, Dictionary<TileStableKey, Queue<TileVisualEntry>> oldVisualsByKey)
+        {
+            int maxColumnCount = 0;
+            for (int rowIndex = 0; rowIndex < patternRows.Count; rowIndex++)
+            {
+                if (patternRows[rowIndex].Count > maxColumnCount)
+                {
+                    maxColumnCount = patternRows[rowIndex].Count;
+                }
+            }
+
+            float globalCenterOffset = (maxColumnCount - 1) * tileSpacing * 0.5f;
+
+            Dictionary<(int Column, BlockColor Color), int> occurrenceCounters = new Dictionary<(int Column, BlockColor Color), int>();
+
+            for (int rowIndex = 0; rowIndex < patternRows.Count; rowIndex++)
+            {
+                List<PatternCell> row = patternRows[rowIndex];
+                float y = (patternRows.Count - 1 - rowIndex) * tileSpacing;
+
+                for (int colIndex = 0; colIndex < row.Count; colIndex++)
+                {
+                    BlockColor color = row[colIndex].Color;
+                    if (color == BlockColor.None)
+                    {
+                        continue;
+                    }
+
+                    var occurrenceKey = (Column: colIndex, Color: color);
+                    if (!occurrenceCounters.TryGetValue(occurrenceKey, out int occurrence))
+                    {
+                        occurrence = 0;
+                    }
+
+                    TileStableKey stableKey = new TileStableKey(colIndex, color, occurrence);
+                    occurrenceCounters[occurrenceKey] = occurrence + 1;
+
+                    float x = (colIndex * tileSpacing) - globalCenterOffset;
+                    Vector3 targetLocalPosition = new Vector3(x, y, 0f);
+                    int sortingOrder = sortingOrderBase + ((patternRows.Count - 1 - rowIndex) * sortingOrderRowStride) + colIndex;
+
+                    TileVisualEntry entry = TryReuseOldVisual(stableKey, oldVisualsByKey);
+                    if (entry == null || entry.Renderer == null)
+                    {
+                        SpriteRenderer renderer = CreateTileRenderer(root, color);
+                        if (renderer == null)
+                        {
+                            continue;
+                        }
+
+                        Transform tileTransform = renderer.transform;
+                        tileTransform.localPosition = targetLocalPosition;
+                        tileTransform.localRotation = Quaternion.identity;
+                        tileTransform.localScale = GetCompensatedVisualScale(tileTransform.parent);
+
+                        entry = new TileVisualEntry
+                        {
+                            Renderer = renderer
+                        };
+                    }
+                    else
+                    {
+                        Transform tileTransform = entry.Renderer.transform;
+                        tileTransform.SetParent(root, false);
+                        tileTransform.localRotation = Quaternion.identity;
+                        tileTransform.localScale = GetCompensatedVisualScale(tileTransform.parent);
+                        entry.Renderer.color = MapColor(color);
+                    }
+
+                    entry.SortingOrder = sortingOrder;
+                    entry.TargetLocalPosition = targetLocalPosition;
+                    entry.Renderer.sortingOrder = sortingOrder;
+                    tileVisuals.Add(entry);
+                }
+            }
+        }
+
+        private TileVisualEntry TryReuseOldVisual(TileStableKey key, Dictionary<TileStableKey, Queue<TileVisualEntry>> oldVisualsByKey)
+        {
+            if (oldVisualsByKey == null)
+            {
+                return null;
+            }
+
+            if (!oldVisualsByKey.TryGetValue(key, out Queue<TileVisualEntry> queue) || queue.Count == 0)
+            {
+                return null;
+            }
+
+            TileVisualEntry entry = queue.Dequeue();
+            if (entry == null || entry.Renderer == null)
+            {
+                return null;
+            }
+
+            return entry;
+        }
+
+        private Dictionary<TileStableKey, Queue<TileVisualEntry>> CaptureCurrentVisualsByKey()
+        {
+            var result = new Dictionary<TileStableKey, Queue<TileVisualEntry>>();
+            var occurrenceCounters = new Dictionary<(int Column, BlockColor Color), int>();
 
             int maxColumnCount = 0;
             for (int rowIndex = 0; rowIndex < patternRows.Count; rowIndex++)
@@ -283,25 +458,164 @@ namespace EliminateGame.Pattern
                         continue;
                     }
 
-                    SpriteRenderer renderer = CreateTileRenderer(root, color);
-                    if (renderer == null)
+                    float x = (colIndex * tileSpacing) - globalCenterOffset;
+                    Vector3 expectedPosition = new Vector3(x, y, 0f);
+                    TileVisualEntry matched = FindAndTakeClosestVisual(color, expectedPosition);
+                    if (matched == null || matched.Renderer == null)
                     {
                         continue;
                     }
 
-                    Transform tileTransform = renderer.transform;
-                    float x = (colIndex * tileSpacing) - globalCenterOffset;
-                    tileTransform.localPosition = new Vector3(x, y, 0f);
-                    tileTransform.localRotation = Quaternion.identity;
-                    tileTransform.localScale = GetCompensatedVisualScale(tileTransform.parent);
-
-                    renderer.sortingOrder = sortingOrderBase + ((patternRows.Count - 1 - rowIndex) * sortingOrderRowStride) + colIndex;
-
-                    tileVisuals.Add(new TileVisualEntry
+                    var occurrenceKey = (Column: colIndex, Color: color);
+                    if (!occurrenceCounters.TryGetValue(occurrenceKey, out int occurrence))
                     {
-                        Renderer = renderer
-                    });
+                        occurrence = 0;
+                    }
+
+                    occurrenceCounters[occurrenceKey] = occurrence + 1;
+                    TileStableKey stableKey = new TileStableKey(colIndex, color, occurrence);
+
+                    if (!result.TryGetValue(stableKey, out Queue<TileVisualEntry> queue))
+                    {
+                        queue = new Queue<TileVisualEntry>();
+                        result.Add(stableKey, queue);
+                    }
+
+                    queue.Enqueue(matched);
                 }
+            }
+
+            return result;
+        }
+
+        private TileVisualEntry FindAndTakeClosestVisual(BlockColor color, Vector3 expectedPosition)
+        {
+            int matchedIndex = -1;
+            float bestDistance = float.MaxValue;
+
+            for (int i = 0; i < tileVisuals.Count; i++)
+            {
+                TileVisualEntry entry = tileVisuals[i];
+                if (entry == null || entry.Renderer == null)
+                {
+                    continue;
+                }
+
+                if (entry.Renderer.color != MapColor(color))
+                {
+                    continue;
+                }
+
+                float distance = Vector3.SqrMagnitude(entry.Renderer.transform.localPosition - expectedPosition);
+                if (distance < bestDistance)
+                {
+                    bestDistance = distance;
+                    matchedIndex = i;
+                }
+            }
+
+            if (matchedIndex < 0)
+            {
+                return null;
+            }
+
+            TileVisualEntry matchedEntry = tileVisuals[matchedIndex];
+            tileVisuals.RemoveAt(matchedIndex);
+            return matchedEntry;
+        }
+
+        private void DestroyRemainingOldVisuals(Dictionary<TileStableKey, Queue<TileVisualEntry>> oldVisualsByKey, List<TileVisualEntry> unmatchedOldVisuals)
+        {
+            if (oldVisualsByKey == null)
+            {
+                return;
+            }
+
+            foreach (KeyValuePair<TileStableKey, Queue<TileVisualEntry>> pair in oldVisualsByKey)
+            {
+                Queue<TileVisualEntry> queue = pair.Value;
+                while (queue.Count > 0)
+                {
+                    TileVisualEntry oldEntry = queue.Dequeue();
+                    if (oldEntry != null && oldEntry.Renderer != null)
+                    {
+                        Destroy(oldEntry.Renderer.gameObject);
+                    }
+                }
+            }
+
+            if (unmatchedOldVisuals == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < unmatchedOldVisuals.Count; i++)
+            {
+                TileVisualEntry leftover = unmatchedOldVisuals[i];
+                if (leftover != null && leftover.Renderer != null)
+                {
+                    Destroy(leftover.Renderer.gameObject);
+                }
+            }
+        }
+
+        private void SnapVisualsToTargetPositions()
+        {
+            for (int i = 0; i < tileVisuals.Count; i++)
+            {
+                TileVisualEntry entry = tileVisuals[i];
+                if (entry == null || entry.Renderer == null)
+                {
+                    continue;
+                }
+
+                entry.Renderer.transform.localPosition = entry.TargetLocalPosition;
+                entry.Renderer.sortingOrder = entry.SortingOrder;
+            }
+        }
+
+        private IEnumerator AnimateFallCoroutine(float duration)
+        {
+            List<Vector3> startPositions = new List<Vector3>(tileVisuals.Count);
+
+            for (int i = 0; i < tileVisuals.Count; i++)
+            {
+                TileVisualEntry entry = tileVisuals[i];
+                startPositions.Add(entry != null && entry.Renderer != null ? entry.Renderer.transform.localPosition : Vector3.zero);
+            }
+
+            float elapsed = 0f;
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / duration);
+
+                for (int i = 0; i < tileVisuals.Count; i++)
+                {
+                    TileVisualEntry entry = tileVisuals[i];
+                    if (entry == null || entry.Renderer == null)
+                    {
+                        continue;
+                    }
+
+                    entry.Renderer.transform.localPosition = Vector3.Lerp(startPositions[i], entry.TargetLocalPosition, t);
+                    entry.Renderer.sortingOrder = entry.SortingOrder;
+                }
+
+                yield return null;
+            }
+
+            SnapVisualsToTargetPositions();
+            fallAnimationCoroutine = null;
+        }
+
+        private void StopFallAnimationIfRunning()
+        {
+            if (fallAnimationCoroutine != null)
+            {
+                StopCoroutine(fallAnimationCoroutine);
+                fallAnimationCoroutine = null;
             }
         }
 
@@ -440,11 +754,13 @@ namespace EliminateGame.Pattern
 
         private void OnDisable()
         {
+            StopFallAnimationIfRunning();
             ClearAllVisuals();
         }
 
         private void OnDestroy()
         {
+            StopFallAnimationIfRunning();
             ClearAllVisuals();
         }
     }
