@@ -13,7 +13,8 @@ namespace EliminateGame.Pattern
         [SerializeField] private GameObject tileVisualPrefab;
         [SerializeField, Min(0.01f)] private float tileSpacing = 1f;
         [SerializeField, Min(0.01f)] private float visualScale = 0.95f;
-        [SerializeField, Min(0f)] private float fallAnimationDuration = 0.15f;
+        [SerializeField, Min(0f)] private float baseFallDuration = 0.08f;
+        [SerializeField, Min(0f)] private float perCellFallTime = 0.06f;
         [SerializeField] private int sortingOrderBase = 300;
         [SerializeField, Min(1)] private int sortingOrderRowStride = 20;
 
@@ -322,13 +323,13 @@ namespace EliminateGame.Pattern
             BuildVisuals(root, oldVisualsByKey);
             DestroyRemainingOldVisuals(oldVisualsByKey, unmatchedOldVisuals);
 
-            if (fallAnimationDuration <= 0f)
+            if (baseFallDuration <= 0f && perCellFallTime <= 0f)
             {
                 SnapVisualsToTargetPositions();
                 return;
             }
 
-            fallAnimationCoroutine = StartCoroutine(AnimateFallCoroutine(fallAnimationDuration));
+            fallAnimationCoroutine = StartCoroutine(AnimateFallCoroutine());
         }
 
         private void BuildVisuals(Transform root, Dictionary<TileStableKey, Queue<TileVisualEntry>> oldVisualsByKey)
@@ -574,22 +575,43 @@ namespace EliminateGame.Pattern
             }
         }
 
-        private IEnumerator AnimateFallCoroutine(float duration)
+        private IEnumerator AnimateFallCoroutine()
         {
             List<Vector3> startPositions = new List<Vector3>(tileVisuals.Count);
+            List<float> durations = new List<float>(tileVisuals.Count);
+            float maxDuration = 0f;
 
             for (int i = 0; i < tileVisuals.Count; i++)
             {
                 TileVisualEntry entry = tileVisuals[i];
-                startPositions.Add(entry != null && entry.Renderer != null ? entry.Renderer.transform.localPosition : Vector3.zero);
+                Vector3 startPosition = entry != null && entry.Renderer != null ? entry.Renderer.transform.localPosition : Vector3.zero;
+                startPositions.Add(startPosition);
+                Vector3 targetPosition = entry != null ? entry.TargetLocalPosition : startPosition;
+
+                float distanceInCells = tileSpacing > 0f
+                    ? Mathf.Abs(targetPosition.y - startPosition.y) / tileSpacing
+                    : 0f;
+                float duration = baseFallDuration + (distanceInCells * perCellFallTime);
+                durations.Add(duration);
+
+                if (duration > maxDuration)
+                {
+                    maxDuration = duration;
+                }
+            }
+
+            if (maxDuration <= 0f)
+            {
+                SnapVisualsToTargetPositions();
+                fallAnimationCoroutine = null;
+                yield break;
             }
 
             float elapsed = 0f;
 
-            while (elapsed < duration)
+            while (elapsed < maxDuration)
             {
                 elapsed += Time.deltaTime;
-                float t = Mathf.Clamp01(elapsed / duration);
 
                 for (int i = 0; i < tileVisuals.Count; i++)
                 {
@@ -598,6 +620,10 @@ namespace EliminateGame.Pattern
                     {
                         continue;
                     }
+
+                    float tileDuration = durations[i];
+                    float t = tileDuration <= 0f ? 1f : Mathf.Clamp01(elapsed / tileDuration);
+                    t = t * t * (3f - (2f * t));
 
                     entry.Renderer.transform.localPosition = Vector3.Lerp(startPositions[i], entry.TargetLocalPosition, t);
                     entry.Renderer.sortingOrder = entry.SortingOrder;
