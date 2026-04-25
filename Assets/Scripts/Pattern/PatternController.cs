@@ -305,7 +305,7 @@ namespace EliminateGame.Pattern
                 return;
             }
 
-            BuildVisuals(root, null);
+            BuildVisuals(root, null, null);
         }
 
         private void RefreshVisualsWithFallAnimation()
@@ -323,7 +323,7 @@ namespace EliminateGame.Pattern
             List<TileVisualEntry> unmatchedOldVisuals = new List<TileVisualEntry>(tileVisuals);
 
             tileVisuals.Clear();
-            BuildVisuals(root, oldVisualsByKey);
+            BuildVisuals(root, oldVisualsByKey, unmatchedOldVisuals);
             DestroyRemainingOldVisuals(oldVisualsByKey, unmatchedOldVisuals);
 
             if (baseFallDuration <= 0f && perCellFallTime <= 0f)
@@ -335,7 +335,7 @@ namespace EliminateGame.Pattern
             fallAnimationCoroutine = StartCoroutine(AnimateFallCoroutine());
         }
 
-        private void BuildVisuals(Transform root, Dictionary<TileStableKey, Queue<TileVisualEntry>> oldVisualsByKey)
+        private void BuildVisuals(Transform root, Dictionary<TileStableKey, Queue<TileVisualEntry>> oldVisualsByKey, List<TileVisualEntry> unmatchedOldVisuals)
         {
             int maxColumnCount = 0;
             for (int rowIndex = 0; rowIndex < patternRows.Count; rowIndex++)
@@ -376,7 +376,7 @@ namespace EliminateGame.Pattern
                     Vector3 targetLocalPosition = new Vector3(x, y, 0f);
                     int sortingOrder = sortingOrderBase + ((patternRows.Count - 1 - rowIndex) * sortingOrderRowStride) + colIndex;
 
-                    TileVisualEntry entry = TryReuseOldVisual(stableKey, oldVisualsByKey);
+                    TileVisualEntry entry = TryReuseOldVisual(stableKey, oldVisualsByKey, unmatchedOldVisuals);
                     if (entry == null || entry.Renderer == null)
                     {
                         SpriteRenderer renderer = CreateTileRenderer(root, color);
@@ -415,7 +415,7 @@ namespace EliminateGame.Pattern
             }
         }
 
-        private TileVisualEntry TryReuseOldVisual(TileStableKey key, Dictionary<TileStableKey, Queue<TileVisualEntry>> oldVisualsByKey)
+        private TileVisualEntry TryReuseOldVisual(TileStableKey key, Dictionary<TileStableKey, Queue<TileVisualEntry>> oldVisualsByKey, List<TileVisualEntry> unmatchedOldVisuals)
         {
             if (oldVisualsByKey == null)
             {
@@ -431,6 +431,11 @@ namespace EliminateGame.Pattern
             if (entry == null || entry.Renderer == null)
             {
                 return null;
+            }
+
+            if (unmatchedOldVisuals != null)
+            {
+                unmatchedOldVisuals.Remove(entry);
             }
 
             return entry;
