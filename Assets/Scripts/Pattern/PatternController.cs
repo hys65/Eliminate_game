@@ -471,6 +471,7 @@ namespace EliminateGame.Pattern
             }
 
             visualObject.name = "PatternTileVisual";
+            RemoveTextComponents(visualObject);
 
             Transform visualTransform = visualObject.transform;
             visualTransform.SetParent(root, false);
@@ -493,6 +494,38 @@ namespace EliminateGame.Pattern
             renderer.color = MapColor(color);
 
             return renderer;
+        }
+
+        private static void RemoveTextComponents(GameObject rootObject)
+        {
+            if (rootObject == null)
+            {
+                return;
+            }
+
+            Component[] components = rootObject.GetComponentsInChildren<Component>(true);
+            for (int i = 0; i < components.Length; i++)
+            {
+                Component component = components[i];
+                if (component == null)
+                {
+                    continue;
+                }
+
+                Type componentType = component.GetType();
+                if (componentType == typeof(Transform) || componentType == typeof(SpriteRenderer))
+                {
+                    continue;
+                }
+
+                string fullName = componentType.FullName;
+                string name = componentType.Name;
+                if ((!string.IsNullOrEmpty(fullName) && fullName.IndexOf("TMPro", StringComparison.OrdinalIgnoreCase) >= 0) ||
+                    (!string.IsNullOrEmpty(name) && name.IndexOf("Text", StringComparison.OrdinalIgnoreCase) >= 0))
+                {
+                    Destroy(component);
+                }
+            }
         }
 
         private void ClearAllVisuals()
