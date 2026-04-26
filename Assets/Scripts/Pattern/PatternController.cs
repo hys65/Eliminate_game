@@ -728,6 +728,7 @@ namespace EliminateGame.Pattern
             Vector3 startScale = ghostRenderer.transform.localScale;
             Color startColor = ghostRenderer.color;
             Color transparentColor = new Color(startColor.r, startColor.g, startColor.b, 0f);
+            const float whiteFlashPortion = 0.25f;
 
             while (elapsed < duration)
             {
@@ -739,7 +740,20 @@ namespace EliminateGame.Pattern
                 elapsed += Time.deltaTime;
                 float t = Mathf.Clamp01(elapsed / duration);
                 ghostRenderer.transform.localScale = Vector3.LerpUnclamped(startScale, Vector3.zero, t);
-                ghostRenderer.color = Color.LerpUnclamped(startColor, transparentColor, t);
+
+                if (t < whiteFlashPortion)
+                {
+                    float flashT = t / whiteFlashPortion;
+                    Color flashColor = Color.LerpUnclamped(startColor, Color.white, flashT);
+                    ghostRenderer.color = new Color(flashColor.r, flashColor.g, flashColor.b, 1f);
+                }
+                else
+                {
+                    float fadeT = (t - whiteFlashPortion) / (1f - whiteFlashPortion);
+                    Color fadeStart = new Color(1f, 1f, 1f, 1f);
+                    ghostRenderer.color = Color.LerpUnclamped(fadeStart, transparentColor, fadeT);
+                }
+
                 yield return null;
             }
 
