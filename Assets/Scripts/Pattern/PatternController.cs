@@ -3,6 +3,7 @@ using SCG = System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using EliminateGame.Camera;
+using EliminateGame.Audio;
 
 namespace EliminateGame.Pattern
 {
@@ -128,6 +129,7 @@ namespace EliminateGame.Pattern
                 SetCellsToNone(bottomRow, colorIndices);
                 comboCount++;
                 CameraShake.Instance?.ShakeWithCombo(comboCount);
+                SfxController.Instance?.PlayPatternHit(comboCount);
                 SCG.List<GravityMove> caseAGravityMoves = ApplyColumnGravity();
                 CollapseIfNeeded();
                 RefreshVisuals(true, caseAGravityMoves);
@@ -141,6 +143,7 @@ namespace EliminateGame.Pattern
             SetCellsToNone(bottomRow, firstThree);
             comboCount++;
             CameraShake.Instance?.ShakeWithCombo(comboCount);
+            SfxController.Instance?.PlayPatternHit(comboCount);
             SCG.List<GravityMove> caseBGravityMoves = ApplyColumnGravity();
             CollapseIfNeeded();
             RefreshVisuals(true, caseBGravityMoves);
