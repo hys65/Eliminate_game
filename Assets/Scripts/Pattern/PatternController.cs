@@ -23,6 +23,7 @@ namespace EliminateGame.Pattern
         private readonly SCG.List<SCG.List<PatternCell>> patternRows = new SCG.List<SCG.List<PatternCell>>();
         private readonly SCG.List<TileVisualEntry> tileVisuals = new SCG.List<TileVisualEntry>();
         private Coroutine fallAnimationCoroutine;
+        private int comboCount;
 
         private static Sprite cachedSolidSquareSprite;
 
@@ -67,6 +68,7 @@ namespace EliminateGame.Pattern
                 patternRows.Add(builtRow);
             }
 
+            comboCount = 0;
             RefreshVisuals(false);
             Debug.Log($"Pattern initialized. Rows={patternRows.Count}, Bottom=[{string.Join(",", GetBottomRowColors())}]");
         }
@@ -99,6 +101,7 @@ namespace EliminateGame.Pattern
             int bottomIndex = GetBottomRowIndex();
             if (bottomIndex < 0)
             {
+                comboCount = 0;
                 return PatternResolveResult.NoMatch();
             }
 
@@ -115,6 +118,7 @@ namespace EliminateGame.Pattern
 
             if (colorIndices.Count == 0)
             {
+                comboCount = 0;
                 return PatternResolveResult.NoMatch();
             }
 
@@ -122,11 +126,12 @@ namespace EliminateGame.Pattern
             {
                 SCG.List<RemovedCellInfo> removedCells = CaptureRemovedCells(bottomIndex, bottomRow, colorIndices);
                 SetCellsToNone(bottomRow, colorIndices);
-                CameraShake.Instance?.Shake();
+                comboCount++;
+                CameraShake.Instance?.ShakeWithCombo(comboCount);
                 SCG.List<GravityMove> caseAGravityMoves = ApplyColumnGravity();
                 CollapseIfNeeded();
                 RefreshVisuals(true, caseAGravityMoves);
-                SpawnGhosts(removedCells);
+                SpawnGhosts(removedCells, comboCount);
                 Debug.Log($"Pattern Case A resolved for {color}. Removed={colorIndices.Count} from bottom row.");
                 return PatternResolveResult.CaseA(colorIndices.Count);
             }
@@ -134,11 +139,12 @@ namespace EliminateGame.Pattern
             SCG.List<int> firstThree = colorIndices.Take(3).ToList();
             SCG.List<RemovedCellInfo> removedThreeCells = CaptureRemovedCells(bottomIndex, bottomRow, firstThree);
             SetCellsToNone(bottomRow, firstThree);
-            CameraShake.Instance?.Shake();
+            comboCount++;
+            CameraShake.Instance?.ShakeWithCombo(comboCount);
             SCG.List<GravityMove> caseBGravityMoves = ApplyColumnGravity();
             CollapseIfNeeded();
             RefreshVisuals(true, caseBGravityMoves);
-            SpawnGhosts(removedThreeCells);
+            SpawnGhosts(removedThreeCells, comboCount);
             Debug.Log($"Pattern Case B resolved for {color}. Removed=3 from bottom row (left-to-right).");
             return PatternResolveResult.CaseB(3);
         }
@@ -651,7 +657,7 @@ namespace EliminateGame.Pattern
             ClearAllVisuals();
         }
 
-        private void SpawnGhosts(SCG.List<RemovedCellInfo> removedCells)
+        private void SpawnGhosts(SCG.List<RemovedCellInfo> removedCells, int comboAtResolve)
         {
             if (removedCells == null || removedCells.Count == 0)
             {
@@ -715,11 +721,11 @@ namespace EliminateGame.Pattern
                 renderer.transform.localScale = GetCompensatedVisualScale(renderer.transform.parent);
                 renderer.sortingOrder = sortingOrderBase + (preResolveRowCount * sortingOrderRowStride) + cell.column;
 
-                StartCoroutine(AnimateGhostCoroutine(renderer));
+                StartCoroutine(AnimateGhostCoroutine(renderer, comboAtResolve));
             }
         }
 
-        private System.Collections.IEnumerator AnimateGhostCoroutine(SpriteRenderer ghostRenderer)
+        private System.Collections.IEnumerator AnimateGhostCoroutine(SpriteRenderer ghostRenderer, int comboAtResolve)
         {
             if (ghostRenderer == null)
             {
@@ -727,11 +733,27 @@ namespace EliminateGame.Pattern
             }
 
             float duration = Mathf.Max(0.05f, ghostDuration);
+            float scaleBoost = 1f;
+            float flashIntensity = 1f;
+
+            if (comboAtResolve >= 3)
+            {
+                duration *= 0.8f;
+                scaleBoost = 1.14f;
+                flashIntensity = 1.25f;
+            }
+            else if (comboAtResolve >= 2)
+            {
+                scaleBoost = 1.08f;
+            }
+
             float elapsed = 0f;
-            Vector3 startScale = ghostRenderer.transform.localScale;
+            Vector3 baseScale = ghostRenderer.transform.localScale;
+            Vector3 startScale = baseScale * scaleBoost;
+            ghostRenderer.transform.localScale = startScale;
             Color startColor = ghostRenderer.color;
             Color transparentColor = new Color(startColor.r, startColor.g, startColor.b, 0f);
-            const float whiteFlashPortion = 0.25f;
+            float whiteFlashPortion = comboAtResolve >= 3 ? 0.18f : 0.25f;
 
             while (elapsed < duration)
             {
@@ -747,7 +769,8 @@ namespace EliminateGame.Pattern
                 if (t < whiteFlashPortion)
                 {
                     float flashT = t / whiteFlashPortion;
-                    Color flashColor = Color.LerpUnclamped(startColor, Color.white, flashT);
+                    Color brightWhite = new Color(flashIntensity, flashIntensity, flashIntensity, 1f);
+                    Color flashColor = Color.LerpUnclamped(startColor, brightWhite, flashT);
                     ghostRenderer.color = new Color(flashColor.r, flashColor.g, flashColor.b, 1f);
                 }
                 else
