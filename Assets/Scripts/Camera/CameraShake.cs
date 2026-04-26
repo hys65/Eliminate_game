@@ -6,9 +6,6 @@ namespace EliminateGame.Camera
     {
         public static CameraShake Instance { get; private set; }
 
-        [SerializeField, Min(0.01f)] private float duration = 0.08f;
-        [SerializeField, Min(0.001f)] private float magnitude = 0.05f;
-
         private Coroutine shakeCoroutine;
         private Vector3 originalLocalPosition;
 
@@ -24,7 +21,7 @@ namespace EliminateGame.Camera
             originalLocalPosition = transform.localPosition;
         }
 
-        public void Shake()
+        public void Shake(float duration = 0.08f, float magnitude = 0.045f)
         {
             if (!isActiveAndEnabled)
             {
@@ -35,13 +32,14 @@ namespace EliminateGame.Camera
             {
                 StopCoroutine(shakeCoroutine);
                 transform.localPosition = originalLocalPosition;
+                shakeCoroutine = null;
             }
 
             originalLocalPosition = transform.localPosition;
-            shakeCoroutine = StartCoroutine(ShakeCoroutine());
+            shakeCoroutine = StartCoroutine(ShakeCoroutine(duration, magnitude));
         }
 
-        private System.Collections.IEnumerator ShakeCoroutine()
+        private System.Collections.IEnumerator ShakeCoroutine(float duration, float magnitude)
         {
             float elapsed = 0f;
 
@@ -49,7 +47,10 @@ namespace EliminateGame.Camera
             {
                 elapsed += Time.deltaTime;
                 Vector2 randomOffset = Random.insideUnitCircle * magnitude;
-                transform.localPosition = originalLocalPosition + new Vector3(randomOffset.x, randomOffset.y, 0f);
+                transform.localPosition = new Vector3(
+                    originalLocalPosition.x + randomOffset.x,
+                    originalLocalPosition.y + randomOffset.y,
+                    originalLocalPosition.z);
                 yield return null;
             }
 
