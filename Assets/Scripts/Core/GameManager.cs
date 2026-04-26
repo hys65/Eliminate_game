@@ -26,6 +26,7 @@ namespace EliminateGame.Core
 
         private System.Random rescueRandom;
         private int rescueUses;
+        private GUIStyle stateLabelStyle;
 
         public GameState State { get; private set; } = GameState.None;
         public int RescueUses => rescueUses;
@@ -197,6 +198,32 @@ namespace EliminateGame.Core
             }
 
             Debug.Log($"Game running. PatternBottom=[{string.Join(",", bottomRow)}], TempCount={tempZoneController.Count}/{tempZoneController.Capacity}, Rescue={rescueUses}/{gameConfig.MaxRescueUses}");
+        }
+
+        private void OnGUI()
+        {
+            if (State != GameState.Won && State != GameState.Failed)
+            {
+                return;
+            }
+
+            if (stateLabelStyle == null)
+            {
+                stateLabelStyle = new GUIStyle(GUI.skin.label)
+                {
+                    alignment = TextAnchor.MiddleCenter,
+                    fontSize = 48,
+                    fontStyle = FontStyle.Bold,
+                    normal =
+                    {
+                        textColor = Color.white
+                    }
+                };
+            }
+
+            string message = State == GameState.Won ? "WIN" : "LOSE";
+            var labelRect = new Rect(0f, 0f, Screen.width, Screen.height);
+            GUI.Label(labelRect, message, stateLabelStyle);
         }
     }
 }
