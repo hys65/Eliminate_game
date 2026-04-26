@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using EliminateGame.Pattern;
@@ -16,6 +17,7 @@ namespace EliminateGame.TempZone
 
         private readonly List<TempZoneSlot> slots = new List<TempZoneSlot>();
         private readonly List<TileVisualEntry> tileVisuals = new List<TileVisualEntry>();
+        private PatternController cachedPatternController;
 
         private static Sprite cachedSolidSquareSprite;
 
@@ -24,6 +26,7 @@ namespace EliminateGame.TempZone
             public BlockColor Color;
             public SpriteRenderer Renderer;
             public TextMeshPro ProgressText;
+            public Coroutine FeedbackCoroutine;
         }
 
         public int Capacity => capacity;
@@ -51,6 +54,12 @@ namespace EliminateGame.TempZone
             int index = slots.Count - 1;
             CreateVisualForColor(color);
             RefreshVisualPositions();
+
+            if (DoesTileMatchCurrentBottomRow(color))
+            {
+                PlayAddMatchFeedbackOnLatestTile();
+            }
+
             Debug.Log($"Temp Zone add: {color} at slot {index}. Count={slots.Count}/{capacity}");
             return index;
         }
@@ -337,6 +346,108 @@ namespace EliminateGame.TempZone
                 renderer.color = ApplyProgressShade(MapColor(entry.Color), progress);
                 UpdateProgressText(entry, progress);
             }
+        }
+
+        private bool DoesTileMatchCurrentBottomRow(BlockColor color)
+        {
+            PatternController patternController = GetPatternController();
+            if (patternController == null)
+            {
+                return false;
+            }
+
+            IReadOnlyList<BlockColor> bottomRowColors = patternController.GetBottomRowColors();
+            return bottomRowColors.Contains(color);
+        }
+
+        private PatternController GetPatternController()
+        {
+            if (cachedPatternController == null)
+            {
+                cachedPatternController = FindObjectOfType<PatternController>();
+            }
+
+            return cachedPatternController;
+        }
+
+        private void PlayAddMatchFeedbackOnLatestTile()
+        {
+            if (tileVisuals.Count == 0)
+            {
+                return;
+            }
+
+            TileVisualEntry entry = tileVisuals[tileVisuals.Count - 1];
+            if (entry == null || entry.Renderer == null)
+            {
+                return;
+            }
+
+            if (entry.FeedbackCoroutine != null)
+            {
+                StopCoroutine(entry.FeedbackCoroutine);
+            }
+
+            entry.FeedbackCoroutine = StartCoroutine(PlayHitFeedback(entry));
+        }
+
+        private IEnumerator PlayHitFeedback(TileVisualEntry entry)
+        {
+            if (entry == null || entry.Renderer == null)
+            {
+                yield break;
+            }
+
+            Transform tileTransform = entry.Renderer.transform;
+            Vector3 normalScale = new Vector3(0.95f, 0.95f, 1f);
+            Vector3 punchScale = normalScale * 1.2f;
+
+            int index = tileVisuals.IndexOf(entry);
+            int progress = index >= 0 && index < slots.Count ? slots[index].ProgressMark : 0;
+            Color baseColor = ApplyProgressShade(MapColor(entry.Color), progress);
+            Color brightColor = baseColor * 1.15f;
+            brightColor.a = baseColor.a;
+
+            const float totalDuration = 0.1f;
+            float halfDuration = totalDuration * 0.5f;
+            float elapsed = 0f;
+
+            while (elapsed < halfDuration)
+            {
+                if (entry.Renderer == null)
+                {
+                    yield break;
+                }
+
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / halfDuration);
+                tileTransform.localScale = Vector3.LerpUnclamped(normalScale, punchScale, t);
+                entry.Renderer.color = Color.Lerp(baseColor, brightColor, t);
+                yield return null;
+            }
+
+            elapsed = 0f;
+            while (elapsed < halfDuration)
+            {
+                if (entry.Renderer == null)
+                {
+                    yield break;
+                }
+
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / halfDuration);
+                tileTransform.localScale = Vector3.LerpUnclamped(punchScale, normalScale, t);
+                entry.Renderer.color = Color.Lerp(brightColor, baseColor, t);
+                yield return null;
+            }
+
+            if (entry.Renderer != null)
+            {
+                tileTransform.localScale = normalScale;
+                entry.Renderer.color = baseColor;
+            }
+
+            entry.FeedbackCoroutine = null;
         }
 
         private void ApplyProgressVisual(int index, int progressMark)
