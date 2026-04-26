@@ -38,7 +38,7 @@ MonoBehaviour:
     Y: 1
     Color: 5
     StartUnlocked: 0
-  - X: 2
+  - X: 1
     Y: 1
     Color: 2
     StartUnlocked: 0
