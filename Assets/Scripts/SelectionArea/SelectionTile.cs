@@ -1,5 +1,6 @@
 using System;
 using EliminateGame.Pattern;
+using EliminateGame.Audio;
 using UnityEngine;
 
 namespace EliminateGame.SelectionArea
@@ -80,6 +81,7 @@ namespace EliminateGame.SelectionArea
             }
 
             Debug.Log($"Click accepted: ({x},{y}) {color}");
+            SfxController.Instance?.PlaySelectionClick();
             Clicked?.Invoke(this);
         }
 
