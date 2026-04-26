@@ -2,6 +2,7 @@ using System;
 using SCG = System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using EliminateGame.Camera;
 
 namespace EliminateGame.Pattern
 {
@@ -121,6 +122,7 @@ namespace EliminateGame.Pattern
             {
                 SCG.List<RemovedCellInfo> removedCells = CaptureRemovedCells(bottomIndex, bottomRow, colorIndices);
                 SetCellsToNone(bottomRow, colorIndices);
+                CameraShake.Instance?.Shake();
                 SCG.List<GravityMove> caseAGravityMoves = ApplyColumnGravity();
                 CollapseIfNeeded();
                 RefreshVisuals(true, caseAGravityMoves);
@@ -132,6 +134,7 @@ namespace EliminateGame.Pattern
             SCG.List<int> firstThree = colorIndices.Take(3).ToList();
             SCG.List<RemovedCellInfo> removedThreeCells = CaptureRemovedCells(bottomIndex, bottomRow, firstThree);
             SetCellsToNone(bottomRow, firstThree);
+            CameraShake.Instance?.Shake();
             SCG.List<GravityMove> caseBGravityMoves = ApplyColumnGravity();
             CollapseIfNeeded();
             RefreshVisuals(true, caseBGravityMoves);
