@@ -21,6 +21,21 @@ namespace EliminateGame.Camera
             originalLocalPosition = transform.localPosition;
         }
 
+        public void ShakeWithCombo(int comboCount, float duration = 0.08f, float magnitude = 0.045f)
+        {
+            float scaledMagnitude = magnitude;
+            if (comboCount >= 3)
+            {
+                scaledMagnitude *= 1.6f;
+            }
+            else if (comboCount == 2)
+            {
+                scaledMagnitude *= 1.3f;
+            }
+
+            Shake(duration, scaledMagnitude);
+        }
+
         public void Shake(float duration = 0.08f, float magnitude = 0.045f)
         {
             if (!isActiveAndEnabled)
