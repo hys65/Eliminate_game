@@ -156,6 +156,17 @@ namespace EliminateGame.Core
 
         private bool ResolveAgainstTempSlot(BlockColor selectedColor, int tempSlotIndex)
         {
+            int bottomRowCount = patternController.GetBottomRowCount(selectedColor);
+            if (bottomRowCount >= 3)
+            {
+                int sameColorCountInTemp = tempZoneController.Slots.Count(slot => slot.Color == selectedColor);
+                if (sameColorCountInTemp < 3)
+                {
+                    Debug.Log($"Case B blocked for {selectedColor}. Temp Zone has {sameColorCountInTemp}/3 required tiles.");
+                    return false;
+                }
+            }
+
             PatternResolveResult result = patternController.ResolveAgainstBottomRow(selectedColor);
             if (!result.Matched)
             {
