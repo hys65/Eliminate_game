@@ -182,6 +182,7 @@ namespace EliminateGame.Core
             if (patternController.IsEmpty)
             {
                 State = GameState.Won;
+                tempZoneController.Clear();
                 Debug.Log("Victory: Entire Pattern is cleared.");
                 return;
             }
