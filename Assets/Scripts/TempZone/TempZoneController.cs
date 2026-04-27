@@ -42,6 +42,13 @@ namespace EliminateGame.TempZone
             Debug.Log($"Temp Zone initialized. Capacity={capacity}");
         }
 
+        public void Clear()
+        {
+            slots.Clear();
+            ClearAllVisuals();
+            Debug.Log("Temp Zone cleared.");
+        }
+
         public int AddTile(BlockColor color)
         {
             if (IsFull)
