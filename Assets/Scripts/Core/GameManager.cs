@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using EliminateGame.Data;
 using EliminateGame.Pattern;
 using EliminateGame.SelectionArea;
@@ -48,6 +49,13 @@ namespace EliminateGame.Core
             if (gameConfig == null || patternController == null || tempZoneController == null || selectionAreaGridController == null)
             {
                 Debug.LogError("Missing references on GameManager.");
+                return;
+            }
+
+            if (!ValidateLevelData(out string validationError))
+            {
+                State = GameState.None;
+                Debug.LogError(validationError);
                 return;
             }
 
@@ -181,6 +189,103 @@ namespace EliminateGame.Core
 
             tempZoneController.RemoveByColor(selectedColor, 3);
             return true;
+        }
+
+        private bool ValidateLevelData(out string errorMessage)
+        {
+            var patternColorCounts = CreateZeroedColorMap();
+            foreach (GameConfig.PatternRowDefinition row in gameConfig.PatternRows)
+            {
+                if (row?.Cells == null)
+                {
+                    continue;
+                }
+
+                foreach (BlockColor color in row.Cells)
+                {
+                    if (color == BlockColor.None)
+                    {
+                        continue;
+                    }
+
+                    if (!patternColorCounts.ContainsKey(color))
+                    {
+                        continue;
+                    }
+
+                    patternColorCounts[color]++;
+                }
+            }
+
+            var selectionColorCounts = CreateZeroedColorMap();
+            var seenPositions = new HashSet<Vector2Int>();
+            foreach (GameConfig.SelectionTileDefinition tile in gameConfig.SelectionTiles)
+            {
+                if (tile == null || tile.Color == BlockColor.None)
+                {
+                    continue;
+                }
+
+                Vector2Int key = new Vector2Int(tile.X, tile.Y);
+                if (!seenPositions.Add(key))
+                {
+                    continue;
+                }
+
+                if (!selectionColorCounts.ContainsKey(tile.Color))
+                {
+                    continue;
+                }
+
+                selectionColorCounts[tile.Color]++;
+            }
+
+            var invalidLines = new List<string>();
+            foreach (BlockColor color in GetPlayableColors())
+            {
+                int pattern = patternColorCounts[color];
+                int selection = selectionColorCounts[color];
+                int required = selection * 3;
+
+                if (pattern != required)
+                {
+                    invalidLines.Add($"Color {color.ToString().ToUpperInvariant()}: Pattern={pattern}, Selection={selection}, Required={required} → INVALID");
+                }
+            }
+
+            if (invalidLines.Count > 0)
+            {
+                var builder = new StringBuilder();
+                builder.AppendLine("Level validation failed. Gameplay is blocked due to invalid color counts.");
+                foreach (string line in invalidLines)
+                {
+                    builder.AppendLine(line);
+                }
+
+                errorMessage = builder.ToString();
+                return false;
+            }
+
+            errorMessage = string.Empty;
+            return true;
+        }
+
+        private static Dictionary<BlockColor, int> CreateZeroedColorMap()
+        {
+            var map = new Dictionary<BlockColor, int>();
+            foreach (BlockColor color in GetPlayableColors())
+            {
+                map[color] = 0;
+            }
+
+            return map;
+        }
+
+        private static IEnumerable<BlockColor> GetPlayableColors()
+        {
+            return System.Enum.GetValues(typeof(BlockColor))
+                .Cast<BlockColor>()
+                .Where(color => color != BlockColor.None);
         }
 
         private void EvaluateStateAfterAction()
