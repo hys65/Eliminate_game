@@ -66,6 +66,7 @@ namespace EliminateGame.Core
             selectionAreaGridController.TileSelected += OnSelectionAreaTileSelected;
 
             Debug.Log("Game run started.");
+            AssertGameRuntimeSafety("StartRun");
             EvaluateStateAfterAction();
         }
 
@@ -127,8 +128,10 @@ namespace EliminateGame.Core
 
             Debug.Log($"[RESOLVE_DEBUG] OnSelectionAreaTileSelected tempZoneCountAfterAdd={tempZoneController.Count} addedSlotIndex={tempSlotIndex}");
 
+            AssertGameRuntimeSafety("OnSelectionAreaTileSelected.BeforeConsume", tile.Color, tempSlotIndex);
             selectionAreaGridController.ConsumeTileAndUnlockCrossNeighbors(tile);
             ResolvePatternUsingTempZoneChain(tile.Color, tempSlotIndex);
+            AssertGameRuntimeSafety("OnSelectionAreaTileSelected.AfterResolve", tile.Color, tempSlotIndex);
             EvaluateStateAfterAction();
         }
 
@@ -207,6 +210,66 @@ namespace EliminateGame.Core
             return -1;
         }
 
+
+        private Dictionary<BlockColor, int> BuildPatternAndTempZoneColorCounts()
+        {
+            var counts = new Dictionary<BlockColor, int>();
+
+            Dictionary<BlockColor, int> patternCounts = patternController.GetNonNoneColorCounts();
+            foreach (KeyValuePair<BlockColor, int> pair in patternCounts)
+            {
+                counts[pair.Key] = counts.GetValueOrDefault(pair.Key, 0) + pair.Value;
+            }
+
+            for (int i = 0; i < tempZoneController.Slots.Count; i++)
+            {
+                BlockColor color = tempZoneController.Slots[i].Color;
+                if (color == BlockColor.None)
+                {
+                    continue;
+                }
+
+                counts[color] = counts.GetValueOrDefault(color, 0) + 1;
+            }
+
+            return counts;
+        }
+
+        private void AssertGameRuntimeSafety(string context, BlockColor color = BlockColor.None, int slotIndex = -1)
+        {
+            Debug.Assert(
+                tempZoneController.Count >= 0,
+                $"[SAFETY][GameManager] Negative TempZone count in {context} for color={color}. TempCount={tempZoneController.Count}.");
+
+            Debug.Assert(
+                slotIndex < 0 || (slotIndex >= 0 && slotIndex < tempZoneController.Slots.Count),
+                $"[SAFETY][GameManager] Invalid slot index in {context} for color={color}. SlotIndex={slotIndex}, SlotCount={tempZoneController.Slots.Count}.");
+
+            Dictionary<BlockColor, int> totalCounts = BuildPatternAndTempZoneColorCounts();
+            foreach (KeyValuePair<BlockColor, int> pair in totalCounts)
+            {
+                Debug.Assert(
+                    pair.Value >= 0,
+                    $"[SAFETY][GameManager] Negative total count in {context} for color={pair.Key}. TotalCount={pair.Value}.");
+            }
+        }
+
+
+        private void AssertColorConsistencyAfterResolve(
+            Dictionary<BlockColor, int> beforeCounts,
+            Dictionary<BlockColor, int> afterCounts,
+            BlockColor targetColor,
+            int expectedDelta,
+            string context)
+        {
+            int beforeTarget = beforeCounts.GetValueOrDefault(targetColor, 0);
+            int afterTarget = afterCounts.GetValueOrDefault(targetColor, 0);
+            int actualDelta = beforeTarget - afterTarget;
+            Debug.Assert(
+                actualDelta == expectedDelta,
+                $"[SAFETY][GameManager] Pattern+TempZone color count mismatch in {context} for color={targetColor}. Before={beforeTarget}, After={afterTarget}, ExpectedDelta={expectedDelta}, ActualDelta={actualDelta}.");
+        }
+
         private bool ResolveAgainstTempSlot(BlockColor selectedColor, int tempSlotIndex)
         {
             int bottomRowCount = patternController.GetBottomRowCount(selectedColor);
@@ -219,6 +282,8 @@ namespace EliminateGame.Core
             }
 
             Debug.Log($"[RESOLVE_DEBUG] ResolveAgainstTempSlot beforeResolve selectedColor={selectedColor} tempSlotIndex={tempSlotIndex}");
+            AssertGameRuntimeSafety("ResolveAgainstTempSlot.BeforePatternResolve", selectedColor, tempSlotIndex);
+            Dictionary<BlockColor, int> beforeCounts = BuildPatternAndTempZoneColorCounts();
             PatternResolveResult result = patternController.ResolveAgainstBottomRow(selectedColor);
             Debug.Log($"[RESOLVE_DEBUG] ResolveAgainstTempSlot afterResolve matched={result.Matched} isCaseA={result.IsCaseA} patternRemovedCount={result.PatternRemovedCount}");
             if (!result.Matched)
@@ -229,6 +294,9 @@ namespace EliminateGame.Core
             if (result.IsCaseA)
             {
                 tempZoneController.ApplyCaseAProgress(tempSlotIndex, result.PatternRemovedCount);
+                Dictionary<BlockColor, int> afterCaseACounts = BuildPatternAndTempZoneColorCounts();
+                AssertColorConsistencyAfterResolve(beforeCounts, afterCaseACounts, selectedColor, result.PatternRemovedCount, "ResolveAgainstTempSlot.AfterCaseA");
+                AssertGameRuntimeSafety("ResolveAgainstTempSlot.AfterCaseA", selectedColor, tempSlotIndex);
                 return true;
             }
 
@@ -236,10 +304,16 @@ namespace EliminateGame.Core
             {
                 Debug.LogWarning($"Unexpected Case B resolve for {selectedColor} while unavailable. Preserving resolve chain by applying Case A progress.");
                 tempZoneController.ApplyCaseAProgress(tempSlotIndex, result.PatternRemovedCount);
+                Dictionary<BlockColor, int> afterCaseACounts = BuildPatternAndTempZoneColorCounts();
+                AssertColorConsistencyAfterResolve(beforeCounts, afterCaseACounts, selectedColor, result.PatternRemovedCount, "ResolveAgainstTempSlot.AfterCaseA");
+                AssertGameRuntimeSafety("ResolveAgainstTempSlot.AfterCaseA", selectedColor, tempSlotIndex);
                 return true;
             }
 
             tempZoneController.RemoveByColor(selectedColor, 3);
+            Dictionary<BlockColor, int> afterCaseBCounts = BuildPatternAndTempZoneColorCounts();
+            AssertColorConsistencyAfterResolve(beforeCounts, afterCaseBCounts, selectedColor, result.PatternRemovedCount + 3, "ResolveAgainstTempSlot.AfterCaseB");
+            AssertGameRuntimeSafety("ResolveAgainstTempSlot.AfterCaseB", selectedColor, tempSlotIndex);
             return true;
         }
 
