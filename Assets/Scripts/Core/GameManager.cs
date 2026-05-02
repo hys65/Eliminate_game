@@ -210,14 +210,12 @@ namespace EliminateGame.Core
         private bool ResolveAgainstTempSlot(BlockColor selectedColor, int tempSlotIndex)
         {
             int bottomRowCount = patternController.GetBottomRowCount(selectedColor);
-            if (bottomRowCount >= 3)
+            int sameColorCountInTemp = tempZoneController.Slots.Count(slot => slot.Color == selectedColor);
+            bool canExecuteCaseB = bottomRowCount >= 3 && sameColorCountInTemp >= 3;
+
+            if (bottomRowCount >= 3 && !canExecuteCaseB)
             {
-                int sameColorCountInTemp = tempZoneController.Slots.Count(slot => slot.Color == selectedColor);
-                if (sameColorCountInTemp < 3)
-                {
-                    Debug.Log($"Case B blocked for {selectedColor}. Temp Zone has {sameColorCountInTemp}/3 required tiles.");
-                    return false;
-                }
+                Debug.Log($"Case B unavailable for {selectedColor}. BottomRowCount={bottomRowCount}, Temp Zone has {sameColorCountInTemp}/3 required tiles. Falling back to Case A.");
             }
 
             Debug.Log($"[RESOLVE_DEBUG] ResolveAgainstTempSlot beforeResolve selectedColor={selectedColor} tempSlotIndex={tempSlotIndex}");
@@ -230,6 +228,13 @@ namespace EliminateGame.Core
 
             if (result.IsCaseA)
             {
+                tempZoneController.ApplyCaseAProgress(tempSlotIndex, result.PatternRemovedCount);
+                return true;
+            }
+
+            if (!canExecuteCaseB)
+            {
+                Debug.LogWarning($"Unexpected Case B resolve for {selectedColor} while unavailable. Preserving resolve chain by applying Case A progress.");
                 tempZoneController.ApplyCaseAProgress(tempSlotIndex, result.PatternRemovedCount);
                 return true;
             }
