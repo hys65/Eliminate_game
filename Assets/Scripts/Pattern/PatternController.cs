@@ -105,7 +105,8 @@ namespace EliminateGame.Pattern
                         continue;
                     }
 
-                    counts[color] = counts.GetValueOrDefault(color, 0) + 1;
+                    int existingCount = counts.TryGetValue(color, out int count) ? count : 0;
+                    counts[color] = existingCount + 1;
                 }
             }
 
