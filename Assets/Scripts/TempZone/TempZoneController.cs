@@ -78,8 +78,12 @@ namespace EliminateGame.TempZone
 
         public bool TryFindMatchingSlot(IReadOnlyCollection<BlockColor> bottomRowColors, out int slotIndex, out BlockColor color)
         {
+            string bottomLog = bottomRowColors != null && bottomRowColors.Count > 0 ? string.Join(",", bottomRowColors) : "<empty>";
+            Debug.Log($"[RESOLVE_DEBUG] TempZone.TryFindMatchingSlot inputBottomRowColors=[{bottomLog}]");
+
             for (int i = 0; i < slots.Count; i++)
             {
+                Debug.Log($"[RESOLVE_DEBUG] TempZone.TryFindMatchingSlot slotIndex={i} color={slots[i].Color} progress={slots[i].ProgressMark}");
                 if (!bottomRowColors.Contains(slots[i].Color))
                 {
                     continue;
@@ -87,17 +91,20 @@ namespace EliminateGame.TempZone
 
                 slotIndex = i;
                 color = slots[i].Color;
+                Debug.Log($"[RESOLVE_DEBUG] TempZone.TryFindMatchingSlot result=true slotIndex={slotIndex} color={color}");
                 return true;
             }
 
             slotIndex = -1;
             color = BlockColor.None;
+            Debug.Log("[RESOLVE_DEBUG] TempZone.TryFindMatchingSlot result=false slotIndex=-1 color=None");
             return false;
         }
 
         public int RemoveByColor(BlockColor color, int removeCount)
         {
             int removed = 0;
+            int beforeCount = slots.Count;
             for (int i = slots.Count - 1; i >= 0 && removed < removeCount; i--)
             {
                 if (slots[i].Color != color)
@@ -116,6 +123,9 @@ namespace EliminateGame.TempZone
                 Debug.Log($"Temp Zone removed {removed} tile(s) of color {color}. Count={slots.Count}/{capacity}");
             }
 
+            string remaining = slots.Count > 0 ? string.Join(",", slots.Select((slot, idx) => $"[{idx}] {slot.Color} p={slot.ProgressMark}")) : "<empty>";
+            Debug.Log($"[RESOLVE_DEBUG] TempZone.RemoveByColor targetColor={color} requestedRemoveCount={removeCount} actualRemovedCount={removed} remainingSlots=[{remaining}] beforeCount={beforeCount} afterCount={slots.Count}");
+
             return removed;
         }
 
@@ -130,6 +140,7 @@ namespace EliminateGame.TempZone
             int previous = slot.ProgressMark;
             slot.IncreaseProgressMark(gainedProgress, 3);
             int next = slot.ProgressMark;
+            Debug.Log($"[RESOLVE_DEBUG] TempZone.ApplyCaseAProgress slotIndex={targetSlotIndex} color={slot.Color} previousProgress={previous} gainedProgress={gainedProgress} nextProgress={next}");
 
             Debug.Log($"Temp Zone progress mark on slot {targetSlotIndex} ({slot.Color}) set to {next}/3.");
 

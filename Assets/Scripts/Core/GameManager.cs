@@ -116,12 +116,16 @@ namespace EliminateGame.Core
                 return;
             }
 
+            Debug.Log($"[RESOLVE_DEBUG] OnSelectionAreaTileSelected clickedColor={tile.Color} tempZoneCountBeforeAdd={tempZoneController.Count}");
             int tempSlotIndex = tempZoneController.AddTile(tile.Color);
             if (tempSlotIndex < 0)
             {
+                Debug.Log($"[RESOLVE_DEBUG] OnSelectionAreaTileSelected addFailed tempZoneCountAfterAdd={tempZoneController.Count}");
                 EvaluateStateAfterAction();
                 return;
             }
+
+            Debug.Log($"[RESOLVE_DEBUG] OnSelectionAreaTileSelected tempZoneCountAfterAdd={tempZoneController.Count} addedSlotIndex={tempSlotIndex}");
 
             selectionAreaGridController.ConsumeTileAndUnlockCrossNeighbors(tile);
             ResolvePatternUsingTempZoneChain(tile.Color, tempSlotIndex);
@@ -135,6 +139,15 @@ namespace EliminateGame.Core
             int iterationLimit = Mathf.Max(1, autoResolveSafetyLimit);
             for (int iteration = 0; iteration < iterationLimit; iteration++)
             {
+                IReadOnlyList<BlockColor> loopBottomRowColors = patternController.GetBottomRowColors();
+                string bottomRowColorLog = loopBottomRowColors.Count > 0 ? string.Join(",", loopBottomRowColors) : "<empty>";
+                string tempSlotLog = tempZoneController.Slots.Count > 0
+                    ? string.Join(" | ", tempZoneController.Slots.Select((slot, idx) => $"[{idx}] {slot.Color} p={slot.ProgressMark}"))
+                    : "<empty>";
+
+                bool hasMatch = tempZoneController.TryFindMatchingSlot(new HashSet<BlockColor>(loopBottomRowColors), out int matchingSlotIndex, out BlockColor matchingColor);
+                Debug.Log($"[RESOLVE_DEBUG] ResolvePatternUsingTempZoneChain iteration={iteration} bottomRowColors=[{bottomRowColorLog}] tempSlots=[{tempSlotLog}] tryFindMatchingSlot={hasMatch} matchingSlotIndex={matchingSlotIndex} matchingColor={matchingColor}");
+
                 if (!TryResolveAnyTempSlotForCurrentBottomRow())
                 {
                     break;
@@ -166,22 +179,12 @@ namespace EliminateGame.Core
                 return false;
             }
 
-            var bottomColorSet = new HashSet<BlockColor>(bottomRowColors);
-            for (int slotIndex = 0; slotIndex < tempZoneController.Slots.Count; slotIndex++)
+            if (!tempZoneController.TryFindMatchingSlot(new HashSet<BlockColor>(bottomRowColors), out int slotIndex, out BlockColor color))
             {
-                BlockColor slotColor = tempZoneController.Slots[slotIndex].Color;
-                if (!bottomColorSet.Contains(slotColor))
-                {
-                    continue;
-                }
-
-                if (ResolveAgainstTempSlot(slotColor, slotIndex))
-                {
-                    return true;
-                }
+                return false;
             }
 
-            return false;
+            return ResolveAgainstTempSlot(color, slotIndex);
         }
 
         private bool IsValidSlotIndexWithColor(int slotIndex, BlockColor color)
@@ -217,7 +220,9 @@ namespace EliminateGame.Core
                 }
             }
 
+            Debug.Log($"[RESOLVE_DEBUG] ResolveAgainstTempSlot beforeResolve selectedColor={selectedColor} tempSlotIndex={tempSlotIndex}");
             PatternResolveResult result = patternController.ResolveAgainstBottomRow(selectedColor);
+            Debug.Log($"[RESOLVE_DEBUG] ResolveAgainstTempSlot afterResolve matched={result.Matched} isCaseA={result.IsCaseA} patternRemovedCount={result.PatternRemovedCount}");
             if (!result.Matched)
             {
                 return false;
