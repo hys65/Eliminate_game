@@ -141,7 +141,11 @@ namespace EliminateGame.Pattern
                 CollapseIfNeeded();
                 RefreshVisuals(true, caseAGravityMoves);
                 SpawnGhosts(removedCells, comboCount);
-                Debug.Log($"[RESOLVE_DEBUG] Pattern.ResolveAgainstBottomRow case=CaseA bottomRowAfterResolve=[{string.Join(",", patternRows[bottomIndex].Select(cell => cell.Color))}] bottomRowAfterGravityCollapse=[{string.Join(",", GetBottomRowColors())}]");
+                int postCaseABottomIndex = GetBottomRowIndex();
+                string postCaseABottomRow = postCaseABottomIndex >= 0
+                    ? string.Join(",", patternRows[postCaseABottomIndex].Select(cell => cell.Color))
+                    : "<empty>";
+                Debug.Log($"[RESOLVE_DEBUG] Pattern.ResolveAgainstBottomRow case=CaseA bottomRowAfterResolve=[{postCaseABottomRow}] bottomRowAfterGravityCollapse=[{string.Join(",", GetBottomRowColors())}]");
                 Debug.Log($"Pattern Case A resolved for {color}. Removed={colorIndices.Count} from bottom row.");
                 return PatternResolveResult.CaseA(colorIndices.Count);
             }
@@ -156,7 +160,11 @@ namespace EliminateGame.Pattern
             CollapseIfNeeded();
             RefreshVisuals(true, caseBGravityMoves);
             SpawnGhosts(removedThreeCells, comboCount);
-            Debug.Log($"[RESOLVE_DEBUG] Pattern.ResolveAgainstBottomRow case=CaseB bottomRowAfterResolve=[{string.Join(",", patternRows[bottomIndex].Select(cell => cell.Color))}] bottomRowAfterGravityCollapse=[{string.Join(",", GetBottomRowColors())}]");
+            int postCaseBBottomIndex = GetBottomRowIndex();
+            string postCaseBBottomRow = postCaseBBottomIndex >= 0
+                ? string.Join(",", patternRows[postCaseBBottomIndex].Select(cell => cell.Color))
+                : "<empty>";
+            Debug.Log($"[RESOLVE_DEBUG] Pattern.ResolveAgainstBottomRow case=CaseB bottomRowAfterResolve=[{postCaseBBottomRow}] bottomRowAfterGravityCollapse=[{string.Join(",", GetBottomRowColors())}]");
             Debug.Log($"Pattern Case B resolved for {color}. Removed=3 from bottom row (left-to-right).");
             return PatternResolveResult.CaseB(3);
         }
