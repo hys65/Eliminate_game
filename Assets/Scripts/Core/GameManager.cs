@@ -135,23 +135,36 @@ namespace EliminateGame.Core
             int iterationLimit = Mathf.Max(1, autoResolveSafetyLimit);
             for (int iteration = 0; iteration < iterationLimit; iteration++)
             {
-                IReadOnlyList<BlockColor> bottomRowColors = patternController.GetBottomRowColors();
-                if (bottomRowColors.Count == 0)
-                {
-                    break;
-                }
-
-                if (!tempZoneController.TryFindMatchingSlot(bottomRowColors, out int matchingSlotIndex, out BlockColor matchingColor))
-                {
-                    break;
-                }
-
-                bool resolved = ResolveAgainstTempSlot(matchingColor, matchingSlotIndex);
-                if (!resolved)
+                if (!TryResolveAnyTempSlotForCurrentBottomRow())
                 {
                     break;
                 }
             }
+        }
+
+        private bool TryResolveAnyTempSlotForCurrentBottomRow()
+        {
+            IReadOnlyList<BlockColor> bottomRowColors = patternController.GetBottomRowColors();
+            if (bottomRowColors.Count == 0)
+            {
+                return false;
+            }
+
+            for (int slotIndex = 0; slotIndex < tempZoneController.Slots.Count; slotIndex++)
+            {
+                BlockColor slotColor = tempZoneController.Slots[slotIndex].Color;
+                if (!bottomRowColors.Contains(slotColor))
+                {
+                    continue;
+                }
+
+                if (ResolveAgainstTempSlot(slotColor, slotIndex))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private bool ResolveAgainstTempSlot(BlockColor selectedColor, int tempSlotIndex)
