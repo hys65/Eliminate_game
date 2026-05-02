@@ -186,6 +186,11 @@ namespace EliminateGame.TempZone
             return removed;
         }
 
+        public void RemoveSlotAtIndex(int index)
+        {
+            RemoveSlotAt(index);
+        }
+
         private void RemoveSlotAt(int index)
         {
             if (index < 0 || index >= slots.Count)
