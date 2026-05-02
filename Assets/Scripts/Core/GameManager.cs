@@ -210,14 +210,14 @@ namespace EliminateGame.Core
         private bool ResolveAgainstTempSlot(BlockColor selectedColor, int tempSlotIndex)
         {
             int bottomRowCount = patternController.GetBottomRowCount(selectedColor);
-            if (bottomRowCount >= 3)
+            int sameColorCountInTemp = tempZoneController.Slots.Count(slot => slot.Color == selectedColor);
+            bool canExecuteCaseB = bottomRowCount >= 3 && sameColorCountInTemp >= 3;
+
+            Debug.Log($"[RESOLVE_DEBUG] ResolveAgainstTempSlot precheck selectedColor={selectedColor} bottomRowCount={bottomRowCount} tempSameColorCount={sameColorCountInTemp} canExecuteCaseB={canExecuteCaseB}");
+
+            if (bottomRowCount >= 3 && !canExecuteCaseB)
             {
-                int sameColorCountInTemp = tempZoneController.Slots.Count(slot => slot.Color == selectedColor);
-                if (sameColorCountInTemp < 3)
-                {
-                    Debug.Log($"Case B blocked for {selectedColor}. Temp Zone has {sameColorCountInTemp}/3 required tiles.");
-                    return false;
-                }
+                Debug.Log($"[RESOLVE_DEBUG] ResolveAgainstTempSlot CaseBUnavailableFallbackToCaseA selectedColor={selectedColor} tempSameColorCount={sameColorCountInTemp}/3");
             }
 
             Debug.Log($"[RESOLVE_DEBUG] ResolveAgainstTempSlot beforeResolve selectedColor={selectedColor} tempSlotIndex={tempSlotIndex}");
@@ -230,6 +230,13 @@ namespace EliminateGame.Core
 
             if (result.IsCaseA)
             {
+                tempZoneController.ApplyCaseAProgress(tempSlotIndex, result.PatternRemovedCount);
+                return true;
+            }
+
+            if (!canExecuteCaseB)
+            {
+                Debug.LogWarning($"[RESOLVE_DEBUG] ResolveAgainstTempSlot unexpectedCaseBResultWithoutRequirements selectedColor={selectedColor} bottomRowCount={bottomRowCount} tempSameColorCount={sameColorCountInTemp}. Falling back to Case A progress.");
                 tempZoneController.ApplyCaseAProgress(tempSlotIndex, result.PatternRemovedCount);
                 return true;
             }
