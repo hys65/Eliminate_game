@@ -169,6 +169,11 @@ namespace EliminateGame.Core
 
         private bool ResolveAgainstTempSlot(BlockColor selectedColor, int tempSlotIndex)
         {
+            if (tempSlotIndex < 0 || tempSlotIndex >= tempZoneController.Slots.Count)
+            {
+                return false;
+            }
+
             int bottomRowCount = patternController.GetBottomRowCount(selectedColor);
             if (bottomRowCount >= 3)
             {
@@ -186,13 +191,7 @@ namespace EliminateGame.Core
                 return false;
             }
 
-            if (result.IsCaseA)
-            {
-                tempZoneController.ApplyCaseAProgress(tempSlotIndex, result.PatternRemovedCount);
-                return true;
-            }
-
-            tempZoneController.RemoveByColor(selectedColor, 3);
+            tempZoneController.RemoveSlotAtIndex(tempSlotIndex);
             return true;
         }
 
