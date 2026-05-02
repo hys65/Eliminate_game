@@ -79,11 +79,15 @@ namespace EliminateGame.Pattern
             int bottomIndex = GetBottomRowIndex();
             if (bottomIndex < 0)
             {
+                Debug.Log("[RESOLVE_DEBUG] Pattern.GetBottomRowColors bottomRowIndex=-1 returnedColors=[<empty>]");
                 return Array.Empty<BlockColor>();
             }
 
             SCG.List<PatternCell> bottomRow = patternRows[bottomIndex];
-            return bottomRow.Where(cell => cell.Color != BlockColor.None).Select(cell => cell.Color).ToList();
+            SCG.List<BlockColor> colors = bottomRow.Where(cell => cell.Color != BlockColor.None).Select(cell => cell.Color).ToList();
+            string colorLog = colors.Count > 0 ? string.Join(",", colors) : "<empty>";
+            Debug.Log($"[RESOLVE_DEBUG] Pattern.GetBottomRowColors bottomRowIndex={bottomIndex} returnedColors=[{colorLog}]");
+            return colors;
         }
 
         public int GetBottomRowCount(BlockColor color)
@@ -107,6 +111,7 @@ namespace EliminateGame.Pattern
             }
 
             SCG.List<PatternCell> bottomRow = patternRows[bottomIndex];
+            string bottomBefore = string.Join(",", bottomRow.Select(cell => cell.Color));
             SCG.List<int> colorIndices = new SCG.List<int>();
 
             for (int i = 0; i < bottomRow.Count; i++)
@@ -116,6 +121,8 @@ namespace EliminateGame.Pattern
                     colorIndices.Add(i);
                 }
             }
+
+            Debug.Log($"[RESOLVE_DEBUG] Pattern.ResolveAgainstBottomRow inputColor={color} bottomRowIndex={bottomIndex} bottomRowBefore=[{bottomBefore}] colorIndicesCount={colorIndices.Count}");
 
             if (colorIndices.Count == 0)
             {
@@ -134,6 +141,7 @@ namespace EliminateGame.Pattern
                 CollapseIfNeeded();
                 RefreshVisuals(true, caseAGravityMoves);
                 SpawnGhosts(removedCells, comboCount);
+                Debug.Log($"[RESOLVE_DEBUG] Pattern.ResolveAgainstBottomRow case=CaseA bottomRowAfterResolve=[{string.Join(",", patternRows[bottomIndex].Select(cell => cell.Color))}] bottomRowAfterGravityCollapse=[{string.Join(",", GetBottomRowColors())}]");
                 Debug.Log($"Pattern Case A resolved for {color}. Removed={colorIndices.Count} from bottom row.");
                 return PatternResolveResult.CaseA(colorIndices.Count);
             }
@@ -148,6 +156,7 @@ namespace EliminateGame.Pattern
             CollapseIfNeeded();
             RefreshVisuals(true, caseBGravityMoves);
             SpawnGhosts(removedThreeCells, comboCount);
+            Debug.Log($"[RESOLVE_DEBUG] Pattern.ResolveAgainstBottomRow case=CaseB bottomRowAfterResolve=[{string.Join(",", patternRows[bottomIndex].Select(cell => cell.Color))}] bottomRowAfterGravityCollapse=[{string.Join(",", GetBottomRowColors())}]");
             Debug.Log($"Pattern Case B resolved for {color}. Removed=3 from bottom row (left-to-right).");
             return PatternResolveResult.CaseB(3);
         }
