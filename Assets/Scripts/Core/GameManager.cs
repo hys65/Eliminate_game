@@ -130,7 +130,7 @@ namespace EliminateGame.Core
 
         private void ResolvePatternUsingTempZoneChain(BlockColor selectedColor, int tempSlotIndex)
         {
-            ResolveAgainstTempSlot(selectedColor, tempSlotIndex);
+            TryResolveSelectedColorFirst(selectedColor, tempSlotIndex);
 
             int iterationLimit = Mathf.Max(1, autoResolveSafetyLimit);
             for (int iteration = 0; iteration < iterationLimit; iteration++)
@@ -142,6 +142,22 @@ namespace EliminateGame.Core
             }
         }
 
+        private bool TryResolveSelectedColorFirst(BlockColor selectedColor, int tempSlotIndex)
+        {
+            int effectiveSlotIndex = tempSlotIndex;
+            if (!IsValidSlotIndexWithColor(effectiveSlotIndex, selectedColor))
+            {
+                effectiveSlotIndex = FindFirstSlotIndexByColor(selectedColor);
+            }
+
+            if (effectiveSlotIndex < 0)
+            {
+                return false;
+            }
+
+            return ResolveAgainstTempSlot(selectedColor, effectiveSlotIndex);
+        }
+
         private bool TryResolveAnyTempSlotForCurrentBottomRow()
         {
             IReadOnlyList<BlockColor> bottomRowColors = patternController.GetBottomRowColors();
@@ -150,10 +166,11 @@ namespace EliminateGame.Core
                 return false;
             }
 
+            var bottomColorSet = new HashSet<BlockColor>(bottomRowColors);
             for (int slotIndex = 0; slotIndex < tempZoneController.Slots.Count; slotIndex++)
             {
                 BlockColor slotColor = tempZoneController.Slots[slotIndex].Color;
-                if (!bottomRowColors.Contains(slotColor))
+                if (!bottomColorSet.Contains(slotColor))
                 {
                     continue;
                 }
@@ -165,6 +182,26 @@ namespace EliminateGame.Core
             }
 
             return false;
+        }
+
+        private bool IsValidSlotIndexWithColor(int slotIndex, BlockColor color)
+        {
+            return slotIndex >= 0
+                   && slotIndex < tempZoneController.Slots.Count
+                   && tempZoneController.Slots[slotIndex].Color == color;
+        }
+
+        private int FindFirstSlotIndexByColor(BlockColor color)
+        {
+            for (int i = 0; i < tempZoneController.Slots.Count; i++)
+            {
+                if (tempZoneController.Slots[i].Color == color)
+                {
+                    return i;
+                }
+            }
+
+            return -1;
         }
 
         private bool ResolveAgainstTempSlot(BlockColor selectedColor, int tempSlotIndex)
