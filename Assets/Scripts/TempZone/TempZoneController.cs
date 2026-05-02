@@ -40,6 +40,7 @@ namespace EliminateGame.TempZone
             slots.Clear();
             ClearAllVisuals();
             Debug.Log($"Temp Zone initialized. Capacity={capacity}");
+            AssertTempZoneRuntimeSafety("Initialize");
         }
 
         public void Clear()
@@ -47,6 +48,7 @@ namespace EliminateGame.TempZone
             slots.Clear();
             ClearAllVisuals();
             Debug.Log("Temp Zone cleared.");
+            AssertTempZoneRuntimeSafety("Clear");
         }
 
         public int AddTile(BlockColor color)
@@ -68,6 +70,7 @@ namespace EliminateGame.TempZone
             }
 
             Debug.Log($"Temp Zone add: {color} at slot {index}. Count={slots.Count}/{capacity}");
+            AssertTempZoneRuntimeSafety("AddTile", color);
             return index;
         }
 
@@ -123,6 +126,7 @@ namespace EliminateGame.TempZone
                 Debug.Log($"Temp Zone removed {removed} tile(s) of color {color}. Count={slots.Count}/{capacity}");
             }
 
+            AssertTempZoneRuntimeSafety("RemoveByColor", color);
             string remaining = slots.Count > 0 ? string.Join(",", slots.Select((slot, idx) => $"[{idx}] {slot.Color} p={slot.ProgressMark}")) : "<empty>";
             Debug.Log($"[RESOLVE_DEBUG] TempZone.RemoveByColor targetColor={color} requestedRemoveCount={removeCount} actualRemovedCount={removed} remainingSlots=[{remaining}] beforeCount={beforeCount} afterCount={slots.Count}");
 
@@ -149,10 +153,12 @@ namespace EliminateGame.TempZone
                 BlockColor color = slot.Color;
                 RemoveSlotAt(targetSlotIndex);
                 Debug.Log($"Temp Zone removed slot {targetSlotIndex} ({color}) after reaching 3/3 progress (from {previous}/3 +{gainedProgress}).");
+                AssertTempZoneRuntimeSafety("ApplyCaseAProgress.RemoveAtMax", color);
                 return;
             }
 
             ApplyProgressVisual(targetSlotIndex, next);
+            AssertTempZoneRuntimeSafety("ApplyCaseAProgress", slot.Color);
         }
 
         public bool HasAnyColorInSet(IReadOnlyCollection<BlockColor> colorSet)
@@ -194,7 +200,24 @@ namespace EliminateGame.TempZone
 
             RefreshVisualPositions();
             Debug.Log($"Temp Zone rescue removed {removed.Count} tile(s). Remaining={slots.Count}/{capacity}");
+            AssertTempZoneRuntimeSafety("RemoveRescueTilesWeighted");
             return removed;
+        }
+
+
+        private void AssertTempZoneRuntimeSafety(string context, BlockColor color = BlockColor.None)
+        {
+            Debug.Assert(
+                slots.Count <= capacity,
+                $"[SAFETY][TempZoneController] Slot overflow in {context} for color={color}. SlotCount={slots.Count}, Capacity={capacity}.");
+
+            for (int i = 0; i < slots.Count; i++)
+            {
+                int progress = slots[i].ProgressMark;
+                Debug.Assert(
+                    progress >= 0 && progress <= 3,
+                    $"[SAFETY][TempZoneController] Invalid progress in {context} at slotIndex={i} color={slots[i].Color}. Progress={progress}, ExpectedRange=[0,3], SlotCount={slots.Count}, Capacity={capacity}.");
+            }
         }
 
         private void RemoveSlotAt(int index)

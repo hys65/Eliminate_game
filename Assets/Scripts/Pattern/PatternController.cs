@@ -90,6 +90,28 @@ namespace EliminateGame.Pattern
             return colors;
         }
 
+
+        public SCG.Dictionary<BlockColor, int> GetNonNoneColorCounts()
+        {
+            var counts = new SCG.Dictionary<BlockColor, int>();
+            for (int rowIndex = 0; rowIndex < patternRows.Count; rowIndex++)
+            {
+                SCG.List<PatternCell> row = patternRows[rowIndex];
+                for (int colIndex = 0; colIndex < row.Count; colIndex++)
+                {
+                    BlockColor color = row[colIndex].Color;
+                    if (color == BlockColor.None)
+                    {
+                        continue;
+                    }
+
+                    counts[color] = counts.GetValueOrDefault(color, 0) + 1;
+                }
+            }
+
+            return counts;
+        }
+
         public int GetBottomRowCount(BlockColor color)
         {
             int bottomIndex = GetBottomRowIndex();
@@ -110,6 +132,7 @@ namespace EliminateGame.Pattern
                 return PatternResolveResult.NoMatch();
             }
 
+            int nonNoneBeforeResolve = GetNonNoneCellCount();
             SCG.List<PatternCell> bottomRow = patternRows[bottomIndex];
             string bottomBefore = string.Join(",", bottomRow.Select(cell => cell.Color));
             SCG.List<int> colorIndices = new SCG.List<int>();
@@ -147,6 +170,7 @@ namespace EliminateGame.Pattern
                     : "<empty>";
                 Debug.Log($"[RESOLVE_DEBUG] Pattern.ResolveAgainstBottomRow case=CaseA bottomRowAfterResolve=[{postCaseABottomRow}] bottomRowAfterGravityCollapse=[{string.Join(",", GetBottomRowColors())}]");
                 Debug.Log($"Pattern Case A resolved for {color}. Removed={colorIndices.Count} from bottom row.");
+                AssertResolvedNonNoneCount(color, nonNoneBeforeResolve - colorIndices.Count, colorIndices.Count);
                 return PatternResolveResult.CaseA(colorIndices.Count);
             }
 
@@ -166,6 +190,7 @@ namespace EliminateGame.Pattern
                 : "<empty>";
             Debug.Log($"[RESOLVE_DEBUG] Pattern.ResolveAgainstBottomRow case=CaseB bottomRowAfterResolve=[{postCaseBBottomRow}] bottomRowAfterGravityCollapse=[{string.Join(",", GetBottomRowColors())}]");
             Debug.Log($"Pattern Case B resolved for {color}. Removed=3 from bottom row (left-to-right).");
+            AssertResolvedNonNoneCount(color, nonNoneBeforeResolve - 3, 3);
             return PatternResolveResult.CaseB(3);
         }
 
@@ -195,6 +220,33 @@ namespace EliminateGame.Pattern
             }
 
             return removedCells;
+        }
+
+
+        private int GetNonNoneCellCount()
+        {
+            int count = 0;
+            for (int rowIndex = 0; rowIndex < patternRows.Count; rowIndex++)
+            {
+                SCG.List<PatternCell> row = patternRows[rowIndex];
+                for (int colIndex = 0; colIndex < row.Count; colIndex++)
+                {
+                    if (row[colIndex].Color != BlockColor.None)
+                    {
+                        count++;
+                    }
+                }
+            }
+
+            return count;
+        }
+
+        private void AssertResolvedNonNoneCount(BlockColor color, int expectedNonNoneCellCount, int removedCount)
+        {
+            int actualNonNoneCellCount = GetNonNoneCellCount();
+            Debug.Assert(
+                actualNonNoneCellCount == expectedNonNoneCellCount,
+                $"[SAFETY][PatternController] Resolve non-None mismatch for color={color}. Removed={removedCount}, ExpectedNonNone={expectedNonNoneCellCount}, ActualNonNone={actualNonNoneCellCount}.");
         }
 
         private int GetBottomRowIndex()
