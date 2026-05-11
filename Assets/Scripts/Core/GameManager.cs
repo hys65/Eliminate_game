@@ -28,6 +28,7 @@ namespace EliminateGame.Core
         private System.Random rescueRandom;
         private int rescueUses;
         private GUIStyle stateLabelStyle;
+        private GUIStyle restartButtonStyle;
 
         public GameState State { get; private set; } = GameState.None;
         public int RescueUses => rescueUses;
@@ -393,9 +394,30 @@ namespace EliminateGame.Core
                 };
             }
 
+            if (restartButtonStyle == null)
+            {
+                restartButtonStyle = new GUIStyle(GUI.skin.button)
+                {
+                    alignment = TextAnchor.MiddleCenter,
+                    fontSize = 28,
+                    fontStyle = FontStyle.Bold
+                };
+            }
+
             string message = State == GameState.Won ? "WIN" : "LOSE";
             var labelRect = new Rect(0f, 0f, Screen.width, Screen.height);
             GUI.Label(labelRect, message, stateLabelStyle);
+
+            const float buttonWidth = 220f;
+            const float buttonHeight = 64f;
+            float buttonX = (Screen.width - buttonWidth) * 0.5f;
+            float buttonY = (Screen.height * 0.5f) + 64f;
+            var buttonRect = new Rect(buttonX, buttonY, buttonWidth, buttonHeight);
+
+            if (GUI.Button(buttonRect, "Restart", restartButtonStyle))
+            {
+                StartRun();
+            }
         }
     }
 }
