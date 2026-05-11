@@ -113,6 +113,29 @@ namespace EliminateGame.Pattern
             return counts;
         }
 
+
+        public bool ContainsColor(BlockColor color)
+        {
+            if (color == BlockColor.None)
+            {
+                return false;
+            }
+
+            for (int rowIndex = 0; rowIndex < patternRows.Count; rowIndex++)
+            {
+                SCG.List<PatternCell> row = patternRows[rowIndex];
+                for (int colIndex = 0; colIndex < row.Count; colIndex++)
+                {
+                    if (row[colIndex].Color == color)
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
         public int GetBottomRowCount(BlockColor color)
         {
             int bottomIndex = GetBottomRowIndex();

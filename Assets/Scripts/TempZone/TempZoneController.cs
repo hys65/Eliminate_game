@@ -161,6 +161,38 @@ namespace EliminateGame.TempZone
             AssertTempZoneRuntimeSafety("ApplyCaseAProgress", slot.Color);
         }
 
+
+        public void RemoveSlotsWhereColorNoLongerExists(Func<BlockColor, bool> colorStillExists)
+        {
+            if (colorStillExists == null)
+            {
+                return;
+            }
+
+            bool removedAny = false;
+            for (int i = slots.Count - 1; i >= 0; i--)
+            {
+                BlockColor color = slots[i].Color;
+                if (color == BlockColor.None || colorStillExists(color))
+                {
+                    continue;
+                }
+
+                slots.RemoveAt(i);
+                RemoveVisualAt(i);
+                removedAny = true;
+            }
+
+            if (!removedAny)
+            {
+                return;
+            }
+
+            RefreshVisualPositions();
+            Debug.Log("Temp Zone removed stale slots whose colors no longer exist in Pattern.");
+            AssertTempZoneRuntimeSafety("RemoveSlotsWhereColorNoLongerExists");
+        }
+
         public bool HasAnyColorInSet(IReadOnlyCollection<BlockColor> colorSet)
         {
             foreach (TempZoneSlot slot in slots)
