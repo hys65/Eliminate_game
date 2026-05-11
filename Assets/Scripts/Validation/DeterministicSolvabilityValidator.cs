@@ -317,7 +317,7 @@ namespace EliminateGame.Validation
             yield return new Vector2Int(position.x, position.y - 1);
         }
 
-        private readonly struct TempSlot
+        private struct TempSlot
         {
             public readonly BlockColor Color;
             public int Progress { get; set; }
