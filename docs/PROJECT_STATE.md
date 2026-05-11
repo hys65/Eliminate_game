@@ -39,6 +39,27 @@
   - 无已知 index crash
   - runtime assertions 生效
   - count consistency 已验证
+  - deterministic solvability validation 已接入 GameManager.StartRun()
+
+  ---
+
+  ## Deterministic Solvability Validation（已接入）
+
+  在 GameManager.StartRun() 执行 deterministic solvability validation。
+
+  当前 validation checks：
+  - PatternCount[color] == SelectionCount[color] * 3
+  - SelectionArea orthogonal reachability
+  - playable sequence solvability
+  - endgame color availability
+  - unavoidable deadlock
+
+  约束说明：
+  - validator is read-only
+  - validator uses copied simulation data
+  - no gameplay semantics changed
+  - no hidden auto-fixes
+  - runtime behavior remains source of truth
 
   ---
 

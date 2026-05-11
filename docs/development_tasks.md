@@ -47,7 +47,9 @@
   - [x] index safety fixes
   - [x] runtime assertions
   - [x] count consistency
+  - [x] sequence validator
   - [x] sequence solvability
+  - [x] deterministic solvability validation
   - [x] runtime deadlock fixes
 
   ---
@@ -77,7 +79,7 @@
 
   ## Level Pipeline
 
-  - [ ] sequence validator
+  - [ ] procedural generation
   - [ ] auto-generated layouts
   - [ ] deterministic level generation
 
