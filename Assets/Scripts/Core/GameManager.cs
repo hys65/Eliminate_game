@@ -4,6 +4,7 @@ using EliminateGame.Data;
 using EliminateGame.Pattern;
 using EliminateGame.SelectionArea;
 using EliminateGame.TempZone;
+using EliminateGame.Validation;
 using UnityEngine;
 
 namespace EliminateGame.Core
@@ -48,6 +49,19 @@ namespace EliminateGame.Core
             if (gameConfig == null || patternController == null || tempZoneController == null || selectionAreaGridController == null)
             {
                 Debug.LogError("Missing references on GameManager.");
+                return;
+            }
+
+            bool validationPassed =
+                DeterministicSolvabilityValidator.Validate(
+                    gameConfig,
+                    "GameManager.StartRun");
+
+            if (!validationPassed)
+            {
+                Debug.LogError(
+                    "Game start aborted because deterministic solvability validation failed.");
+
                 return;
             }
 
