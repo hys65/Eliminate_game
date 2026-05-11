@@ -1,73 +1,176 @@
-# ARCHITECTURE
+- # ARCHITECTURE
 
-## 总体结构
+  # 总体结构
 
-GameManager
- ├── SelectionAreaController
- ├── TempZoneController
- └── PatternController
+  GameManager
+   ├── SelectionAreaController
+   ├── TempZoneController
+   └── PatternController
 
----
+  ---
 
-## 三区域空间布局（运行时）
-- Top: Pattern（目标区）
-- Middle: TempZone（暂存区）
-- Bottom: SelectionArea（输入区）
+  # 三层结构
 
----
+  Top:
+  - Pattern
 
-## 数据流（稳定版本）
-SelectionTile (点击，SelectionArea only)
-    ↓
-SelectionAreaController
-    ↓ (事件)
-GameManager
-    ↓
-TempZoneController（入列 + 进度文本更新）
-    ↓
-PatternController（底行匹配/消除 + ghost 反馈 + 列内下落）
-    ↓
-GameManager（胜负判定 + 成功消除触发相机抖动）
+  Middle:
+  - TempZone
 
----
+  Bottom:
+  - SelectionArea
 
-## 核心流程（当前已完成）
-1. 玩家点击 SelectionArea 可点击方块。
-2. 触发 SelectionArea 解锁扩展（十字邻居：left/right/up/down）。
-3. GameManager 接收事件并将方块送入 TempZone。
-4. TempZone 更新容量进度文本（0/3、1/3、2/3）。
-5. PatternController 检测并解析 Pattern 底行匹配。
-6. 匹配成功时：
-   - 底行相关单元消除（保留 BlockColor.None 结构槽语义）
-   - 显示 removed-cell ghost 反馈
-   - 执行同列重力下落（仅目标列移动）
-   - 触发相机抖动
-7. GameManager 按规则更新胜负状态。
+  ---
 
----
+  # Runtime Flow（稳定版）
 
-## 模块职责边界（保持不变）
-- SelectionArea：
-  - 负责输入与解锁状态。
-  - 不直接操作 Pattern 消除。
-- TempZone：
-  - 负责暂存与进度显示。
-  - 不是输入源，不负责消除逻辑。
-- Pattern：
-  - 负责显示、匹配、消除、列内重力与视觉反馈。
-  - 不处理点击输入。
-- GameManager：
-  - 唯一调度入口。
-  - 负责串联 Selection → TempZone → Pattern 与胜负判定。
+  Selection click
+  → TempZone add
+  → Pattern resolve
+  → gravity
+  → collapse
+  → auto resolve chain
+  → win/lose check
 
----
+  ---
 
-## 胜负规则（当前实现）
-- WIN：Pattern 为空。
-- LOSE：TempZone 已满，且 TempZone 无颜色匹配当前 Pattern 底行。
+  # 模块职责
 
----
+  ## SelectionArea
 
-## 已知回退约束
-- PR #31 的一次消除反馈实现曾破坏 TempZone（出现消失问题）并已回退。
-- 后续反馈层改动必须是纯视觉，不得影响 resolve / gravity / TempZone 流程。
+  职责：
+  - 玩家输入
+  - 解锁逻辑
+  - tile 提供
+
+  规则：
+  - 仅输入层
+  - 不直接操作 Pattern
+
+  ---
+
+  ## TempZone
+
+  职责：
+  - 解析暂存
+  - progress tracking
+  - Case A / B 数据管理
+
+  规则：
+  - 非输入层
+  - 不负责 Pattern gravity
+  - 不负责点击
+
+  ---
+
+  ## Pattern
+
+  职责：
+  - logical grid
+  - visual grid
+  - bottom-row query
+  - resolve
+  - gravity
+  - collapse
+
+  规则：
+  - column gravity only
+  - no cross-column movement
+  - logical state 是 runtime source of truth
+
+  ---
+
+  ## GameManager
+
+  职责：
+  - 唯一调度入口
+  - 串联：
+    Selection
+    → TempZone
+    → Pattern
+  - 管理 resolve chain
+  - 管理 win/lose
+
+  ---
+
+  # Resolve Semantics
+
+  ## Case A
+
+  条件：
+  - 底行同色数量 < 3
+  或
+  - Case B 条件不足
+
+  行为：
+  - 消除 Pattern 单元
+  - 增加 TempZone progress
+
+  ---
+
+  ## Case B
+
+  条件：
+  - 底行同色数量 >= 3
+  并且
+  - TempZone 同色数量 >= 3
+
+  行为：
+  - 消除 3 个 Pattern 单元
+  - 消除 3 个 TempZone 单元
+
+  ---
+
+  # Fallback Rule（关键）
+
+  Case B 条件不足：
+  必须 fallback 到 Case A。
+
+  禁止：
+  - resolve chain deadlock
+  - 卡死
+
+  ---
+
+  # Auto Resolve Chain
+
+  Resolve 后必须：
+
+  - 获取新底行
+  - 查找 TempZone 可匹配颜色
+  - 自动继续 resolve
+  - 直到不存在匹配
+
+  ---
+
+  # Runtime Safety
+
+  允许：
+  - Debug.Assert
+  - Runtime validation
+  - Deterministic logs
+
+  禁止：
+  - Hidden auto-fix
+  - Silent gameplay mutation
+  - Runtime rule rewriting
+
+  ---
+
+  # 可通关规则
+
+  ## 总数量规则
+
+  PatternCount[color]
+  =
+  SelectionAreaCount[color] * 3
+
+  ---
+
+  ## 顺序可通关
+
+  SelectionArea 解锁顺序
+  必须支持：
+  - Pattern 推进
+  - 底行变化
+  - 后期颜色可达

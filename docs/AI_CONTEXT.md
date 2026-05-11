@@ -1,68 +1,221 @@
-# AI_CONTEXT
+- # AI_CONTEXT
 
-## 游戏核心（一句话）
-玩家点击 SelectionArea 方块 → 进入 TempZone → 触发 Pattern 底行消除与列内下落 → 清空 Pattern 获胜。
+  ## 游戏核心（一句话）
 
----
+  玩家点击 SelectionArea 方块
+  → 进入 TempZone
+  → 触发 Pattern 底行解析
+  → 执行消除与列内下落
+  → 自动 Resolve Chain
+  → 清空 Pattern 获胜。
 
-## 当前三大区域布局（已建立）
-- Top = Pattern
-- Middle = TempZone
-- Bottom = SelectionArea
+  ---
 
----
+  # 当前三层结构（稳定版本）
 
-## 当前系统状态（已完成）
+  Top:
+  - Pattern（目标区）
 
-### 1. SelectionArea（选区）
-- 仅 SelectionArea 方块可点击。
-- 初始解锁：仅第一行解锁。
-- 其余下方行初始均锁定。
-- 点击后保持十字邻居解锁规则：left / right / up / down（存在则解锁）。
-- 该解锁规则为当前项目的明确保留规则。
+  Middle:
+  - TempZone（解析暂存区）
 
-### 2. TempZone（临时区）
-- 接收来自 SelectionArea 的已点击方块。
-- 定位为存储/展示区，不是输入源。
-- 显示进度文本：0/3、1/3、2/3。
-- TextMeshPro Essentials 已导入，TMP 文本工作正常。
+  Bottom:
+  - SelectionArea（唯一输入区）
 
-### 3. Pattern（目标区）
-- 顶部目标区域，仅用于显示/消除，不可点击。
-- Pattern 内不显示文字标签。
-- 保留 BlockColor.None 结构空槽。
-- 使用全局列对齐。
-- 使用列内重力：底行匹配消除后，仅同列上方方块下落。
-- 下落动画已正确：仅目标列移动，无跨列下落。
-- 已具备被消除单元 ghost 反馈。
-- 成功消除时相机抖动已生效。
+  ---
 
----
+  # 当前核心规则（必须保持）
 
-## 当前稳定玩法循环（已验证）
-SelectionArea click
-→ tile enters TempZone
-→ Pattern bottom row resolves
-→ TempZone progress updates
-→ Pattern removed cells show feedback
-→ same-column gravity fall occurs
-→ camera shake triggers on successful elimination
+  ## SelectionArea
 
----
+  规则：
+  - 只有 SelectionArea 可点击。
+  - 初始仅第一行解锁。
+  - 点击后解锁十字邻居：
+    - up
+    - down
+    - left
+    - right
+  - 不允许对角解锁。
 
-## 胜负规则（当前保留）
-- WIN：Pattern 为空。
-- LOSE：TempZone 已满，且 TempZone 中不存在可匹配当前 Pattern 底行的颜色。
+  重要：
+  SelectionArea 的布局顺序会影响可通关性。
 
----
+  ---
 
-## 开发状态
-- 核心玩法循环可玩。
-- C. Pattern 可视化 / 重力 / 反馈：功能完成。
-- 下一步应聚焦：胜负 UI 与状态展示的验证与加固；不改核心规则。
+  ## TempZone
 
----
+  规则：
+  - TempZone 不是输入源。
+  - TempZone 负责存储解析进度。
+  - TempZone 使用：
+    - 0/3
+    - 1/3
+    - 2/3
+    进度状态。
 
-## 近期变更记录（风险提示）
-- PR #31 的消除反馈实现曾导致 TempZone 消失，已回退。
-- 后续做消除反馈时必须保持“纯视觉层”实现，不得打断 resolve / gravity / TempZone 主流程。
+  ---
+
+  ## Pattern
+
+  规则：
+  - 不可点击。
+  - 仅用于显示、解析、消除。
+  - 使用列内重力。
+  - 不允许跨列移动。
+  - 支持 collapse。
+  - 支持 ghost feedback。
+  - 支持 camera shake。
+  - 底行是唯一匹配来源。
+
+  ---
+
+  # Resolve 规则（当前稳定版）
+
+  ## Case A
+
+  条件：
+  - 当前底行同色数量 < 3
+  或
+  - Case B 条件不足
+
+  行为：
+  - 消除当前匹配 Pattern 单元
+  - TempZone 增加 progress
+  - TempZone slot 保留
+
+  ---
+
+  ## Case B
+
+  条件：
+  - 底行同色数量 >= 3
+  并且
+  - TempZone 同色数量 >= 3
+
+  行为：
+  - 消除 3 个 Pattern 单元
+  - 消除 3 个 TempZone 单元
+
+  ---
+
+  ## Case B fallback 规则（重要）
+
+  如果：
+  - 底行同色 >= 3
+  但
+  - TempZone 数量不足 3
+
+  必须：
+  → fallback 到 Case A
+
+  禁止：
+  - resolve chain 卡死
+  - 直接中断解析
+
+  ---
+
+  # 自动解析链（Auto Resolve Chain）
+
+  玩家点击后：
+
+  SelectionArea click
+  → tile enters TempZone
+  → resolve selected color
+  → gravity
+  → collapse
+  → 获取新的底行
+  → 自动继续解析 TempZone 中可匹配颜色
+  → 直到不存在可匹配颜色
+
+  ---
+
+  # 可通关规则（必须保持）
+
+  ## 总数量规则
+
+  对于每个颜色：
+
+  PatternCount[color]
+  =
+  SelectionAreaCount[color] * 3
+
+  ---
+
+  ## 顺序可通关规则（重要）
+
+  即使总数量正确：
+
+  也必须保证：
+  - SelectionArea 解锁顺序可达
+  - Pattern 底行推进过程中存在可获取颜色
+  - 不允许出现“后期缺色”
+
+  ---
+
+  # TempZone 清理规则
+
+  如果：
+  Pattern 已不存在某颜色
+
+  则：
+  TempZone 不允许继续保留该颜色。
+
+  必须自动清理 stale slot。
+
+  ---
+
+  # 胜负规则
+
+  ## WIN
+
+  条件：
+  - Pattern 完全为空
+
+  行为：
+  - 停止输入
+  - 显示 WIN
+  - 清空 TempZone 可视状态
+
+  ---
+
+  ## LOSE
+
+  条件：
+  - TempZone 已满
+  并且
+  - TempZone 无颜色匹配当前 Pattern 底行
+
+  行为：
+  - 停止输入
+  - 显示 LOSE
+
+  ---
+
+  # 当前稳定状态（已验证）
+
+  已验证：
+  - Same-color resolve
+  - Auto resolve chain
+  - Case A
+  - Case B
+  - Case B fallback
+  - Column gravity
+  - Collapse
+  - TempZone cleanup
+  - Win state
+  - Lose state
+  - Runtime assertions
+  - Count consistency
+  - Sequence solvability
+
+  ---
+
+  # 开发原则（必须遵守）
+
+  - Docs 是唯一事实源。
+  - 禁止猜规则。
+  - 禁止私自修改玩法语义。
+  - Runtime correctness 优先。
+  - 稳定性优先于优化。
+  - 优先最小安全修复。
