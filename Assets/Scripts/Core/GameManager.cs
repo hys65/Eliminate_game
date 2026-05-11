@@ -300,6 +300,7 @@ namespace EliminateGame.Core
                 Dictionary<BlockColor, int> afterCaseACounts = BuildPatternAndTempZoneColorCounts();
                 AssertColorConsistencyAfterResolve(beforeCounts, afterCaseACounts, selectedColor, result.PatternRemovedCount, "ResolveAgainstTempSlot.AfterCaseA");
                 AssertGameRuntimeSafety("ResolveAgainstTempSlot.AfterCaseA", selectedColor, tempSlotIndex);
+                CleanupStaleTempZoneSlotsAfterPatternUpdate();
                 return true;
             }
 
@@ -310,6 +311,7 @@ namespace EliminateGame.Core
                 Dictionary<BlockColor, int> afterCaseACounts = BuildPatternAndTempZoneColorCounts();
                 AssertColorConsistencyAfterResolve(beforeCounts, afterCaseACounts, selectedColor, result.PatternRemovedCount, "ResolveAgainstTempSlot.AfterCaseA");
                 AssertGameRuntimeSafety("ResolveAgainstTempSlot.AfterCaseA", selectedColor, tempSlotIndex);
+                CleanupStaleTempZoneSlotsAfterPatternUpdate();
                 return true;
             }
 
@@ -317,7 +319,14 @@ namespace EliminateGame.Core
             Dictionary<BlockColor, int> afterCaseBCounts = BuildPatternAndTempZoneColorCounts();
             AssertColorConsistencyAfterResolve(beforeCounts, afterCaseBCounts, selectedColor, result.PatternRemovedCount + 3, "ResolveAgainstTempSlot.AfterCaseB");
             AssertGameRuntimeSafety("ResolveAgainstTempSlot.AfterCaseB", selectedColor, tempSlotIndex);
+            CleanupStaleTempZoneSlotsAfterPatternUpdate();
             return true;
+        }
+
+
+        private void CleanupStaleTempZoneSlotsAfterPatternUpdate()
+        {
+            tempZoneController.RemoveSlotsWhereColorNoLongerExists(patternController.ContainsColor);
         }
 
         private void EvaluateStateAfterAction()
