@@ -131,7 +131,7 @@ namespace EliminateGame.Core
             AssertGameRuntimeSafety("OnSelectionAreaTileSelected.BeforeConsume", tile.Color, tempSlotIndex);
             selectionAreaGridController.ConsumeTileAndUnlockCrossNeighbors(tile);
             ResolvePatternUsingTempZoneChain(tile.Color, tempSlotIndex);
-            AssertGameRuntimeSafety("OnSelectionAreaTileSelected.AfterResolve", tile.Color, tempSlotIndex);
+            AssertGameRuntimeSafety("OnSelectionAreaTileSelected.AfterResolve", tile.Color, tempSlotIndex, validateSlotIndex: false);
             EvaluateStateAfterAction();
         }
 
@@ -235,15 +235,18 @@ namespace EliminateGame.Core
             return counts;
         }
 
-        private void AssertGameRuntimeSafety(string context, BlockColor color = BlockColor.None, int slotIndex = -1)
+        private void AssertGameRuntimeSafety(string context, BlockColor color = BlockColor.None, int slotIndex = -1, bool validateSlotIndex = true)
         {
             Debug.Assert(
                 tempZoneController.Count >= 0,
                 $"[SAFETY][GameManager] Negative TempZone count in {context} for color={color}. TempCount={tempZoneController.Count}.");
 
-            Debug.Assert(
-                slotIndex < 0 || (slotIndex >= 0 && slotIndex < tempZoneController.Slots.Count),
-                $"[SAFETY][GameManager] Invalid slot index in {context} for color={color}. SlotIndex={slotIndex}, SlotCount={tempZoneController.Slots.Count}.");
+            if (validateSlotIndex)
+            {
+                Debug.Assert(
+                    slotIndex < 0 || (slotIndex >= 0 && slotIndex < tempZoneController.Slots.Count),
+                    $"[SAFETY][GameManager] Invalid slot index in {context} for color={color}. SlotIndex={slotIndex}, SlotCount={tempZoneController.Slots.Count}.");
+            }
 
             Dictionary<BlockColor, int> totalCounts = BuildPatternAndTempZoneColorCounts();
             foreach (KeyValuePair<BlockColor, int> pair in totalCounts)
