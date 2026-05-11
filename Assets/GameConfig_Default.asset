@@ -28,7 +28,7 @@ MonoBehaviour:
     StartUnlocked: 1
   - X: 1
     Y: 0
-    Color: 4
+    Color: 1
     StartUnlocked: 1
   - X: 2
     Y: 0
@@ -44,7 +44,7 @@ MonoBehaviour:
     StartUnlocked: 0
   - X: 0
     Y: 2
-    Color: 1
+    Color: 4
     StartUnlocked: 0
   - X: 1
     Y: 2
