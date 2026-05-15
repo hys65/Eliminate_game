@@ -13,6 +13,8 @@ namespace EliminateGame.Core
     {
         [Header("Config")]
         [SerializeField] private GameConfig gameConfig;
+        [SerializeField] private LevelDatabase levelDatabase;
+        [SerializeField] private int currentLevelIndex;
 
         [Header("Controllers")]
         [SerializeField] private PatternController patternController;
@@ -30,10 +32,11 @@ namespace EliminateGame.Core
         private GUIStyle stateLabelStyle;
         private GUIStyle restartButtonStyle;
         private bool isMenuOpen;
+        private GameConfig activeGameConfig;
 
         public GameState State { get; private set; } = GameState.None;
         public int RescueUses => rescueUses;
-        public int RescueUsesLeft => gameConfig != null ? Mathf.Max(0, gameConfig.MaxRescueUses - rescueUses) : 0;
+        public int RescueUsesLeft => activeGameConfig != null ? Mathf.Max(0, activeGameConfig.MaxRescueUses - rescueUses) : 0;
 
         private void Awake()
         {
@@ -48,15 +51,24 @@ namespace EliminateGame.Core
         [ContextMenu("Start Run")]
         public void StartRun()
         {
-            if (gameConfig == null || patternController == null || tempZoneController == null || selectionAreaGridController == null)
+            if (patternController == null || tempZoneController == null || selectionAreaGridController == null)
             {
                 Debug.LogError("Missing references on GameManager.");
                 return;
             }
 
+            GameConfig activeConfig = ResolveActiveGameConfig();
+            if (activeConfig == null)
+            {
+                Debug.LogError("No valid GameConfig resolved for GameManager.StartRun.");
+                return;
+            }
+
+            activeGameConfig = activeConfig;
+
             bool validationPassed =
                 DeterministicSolvabilityValidator.Validate(
-                    gameConfig,
+                    activeConfig,
                     "GameManager.StartRun");
 
             if (!validationPassed)
@@ -71,15 +83,15 @@ namespace EliminateGame.Core
             State = GameState.Running;
             isMenuOpen = false;
 
-            var patternRows = gameConfig.PatternRows
+            var patternRows = activeConfig.PatternRows
                 .Select(row => (IReadOnlyList<BlockColor>)row.Cells)
                 .ToList();
 
             patternController.Initialize(patternRows);
-            tempZoneController.Initialize(gameConfig.TempZoneCapacity);
+            tempZoneController.Initialize(activeConfig.TempZoneCapacity);
 
             selectionAreaGridController.TileSelected -= OnSelectionAreaTileSelected;
-            selectionAreaGridController.Initialize(gameConfig);
+            selectionAreaGridController.Initialize(activeConfig);
             selectionAreaGridController.TileSelected += OnSelectionAreaTileSelected;
 
             Debug.Log("Game run started.");
@@ -87,6 +99,21 @@ namespace EliminateGame.Core
             EvaluateStateAfterAction();
         }
 
+
+        private GameConfig ResolveActiveGameConfig()
+        {
+            if (levelDatabase != null)
+            {
+                if (levelDatabase.TryGetLevel(currentLevelIndex, out GameConfig levelConfig))
+                {
+                    return levelConfig;
+                }
+
+                return levelDatabase.GetDefaultLevel();
+            }
+
+            return gameConfig;
+        }
         [ContextMenu("Try Use Rescue")]
         public bool TryUseRescue()
         {
@@ -96,7 +123,7 @@ namespace EliminateGame.Core
                 return false;
             }
 
-            if (rescueUses >= gameConfig.MaxRescueUses)
+            if (activeGameConfig == null || rescueUses >= activeGameConfig.MaxRescueUses)
             {
                 Debug.Log("Rescue failed. Max rescue uses reached.");
                 return false;
@@ -115,7 +142,7 @@ namespace EliminateGame.Core
             }
 
             rescueUses++;
-            Debug.Log($"Rescue used. Count={rescueUses}/{gameConfig.MaxRescueUses}");
+            Debug.Log($"Rescue used. Count={rescueUses}/{activeGameConfig.MaxRescueUses}");
             EvaluateStateAfterAction();
             return true;
         }
