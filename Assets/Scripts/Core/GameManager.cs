@@ -29,6 +29,7 @@ namespace EliminateGame.Core
         private int rescueUses;
         private GUIStyle stateLabelStyle;
         private GUIStyle restartButtonStyle;
+        private bool isMenuOpen;
 
         public GameState State { get; private set; } = GameState.None;
         public int RescueUses => rescueUses;
@@ -68,6 +69,7 @@ namespace EliminateGame.Core
 
             rescueUses = 0;
             State = GameState.Running;
+            isMenuOpen = false;
 
             var patternRows = gameConfig.PatternRows
                 .Select(row => (IReadOnlyList<BlockColor>)row.Cells)
@@ -375,6 +377,29 @@ namespace EliminateGame.Core
 
         private void OnGUI()
         {
+            bool showInGameMenu = State == GameState.Running || State == GameState.Won || State == GameState.Failed;
+            if (showInGameMenu)
+            {
+                var menuButtonRect = new Rect(12f, 12f, 96f, 36f);
+                if (GUI.Button(menuButtonRect, "Menu"))
+                {
+                    isMenuOpen = !isMenuOpen;
+                }
+
+                if (isMenuOpen)
+                {
+                    var panelRect = new Rect(12f, 52f, 120f, 52f);
+                    GUI.Box(panelRect, string.Empty);
+
+                    var restartMenuRect = new Rect(20f, 60f, 104f, 36f);
+                    if (GUI.Button(restartMenuRect, "Restart"))
+                    {
+                        isMenuOpen = false;
+                        StartRun();
+                    }
+                }
+            }
+
             if (State != GameState.Won && State != GameState.Failed)
             {
                 return;
