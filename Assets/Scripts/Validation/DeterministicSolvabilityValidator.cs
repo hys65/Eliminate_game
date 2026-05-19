@@ -10,41 +10,43 @@ namespace EliminateGame.Validation
     public static class DeterministicSolvabilityValidator
     {
         private const int MaxSearchNodes = 200000;
+        private const int AutoResolveSafetyLimit = 256;
 
         public static bool Validate(GameConfig config, string context)
         {
+            string safeContext = string.IsNullOrWhiteSpace(context) ? "UnknownContext" : context;
+
             if (config == null)
             {
-                Debug.LogError($"[SOLVABILITY_VALIDATION][{context}] FAILED: GameConfig is null.");
+                Debug.LogError($"[SOLVABILITY_VALIDATION][{safeContext}] FAILED: GameConfig is null.");
                 return false;
             }
 
-            ValidationSnapshot snapshot = ValidationSnapshot.FromConfig(config);
-            List<string> errors = new List<string>();
+            Snapshot snapshot = Snapshot.FromConfig(config);
+            List<string> failures = new List<string>();
 
-            ValidateColorCounts(snapshot, errors);
-            ValidateInitialUnlocks(snapshot, errors);
-            ValidateReachability(snapshot, errors);
-            ValidateDeterministicPlayableSequence(snapshot, errors);
+            ValidateColorCountRule(snapshot, failures);
+            ValidateStartUnlockReachability(snapshot, failures);
+            ValidatePlayableSequence(snapshot, failures);
 
-            if (errors.Count > 0)
+            if (failures.Count > 0)
             {
                 StringBuilder builder = new StringBuilder();
-                builder.AppendLine($"[SOLVABILITY_VALIDATION][{context}] FAILED");
-                for (int i = 0; i < errors.Count; i++)
+                builder.AppendLine($"[SOLVABILITY_VALIDATION][{safeContext}] FAILED");
+                for (int i = 0; i < failures.Count; i++)
                 {
-                    builder.AppendLine($"- {errors[i]}");
+                    builder.AppendLine($"- {failures[i]}");
                 }
 
                 Debug.LogError(builder.ToString());
                 return false;
             }
 
-            Debug.Log($"[SOLVABILITY_VALIDATION][{context}] PASSED: Pattern colors, SelectionArea reachability, endgame color availability, and deterministic sequence solvability are valid.");
+            Debug.Log($"[SOLVABILITY_VALIDATION][{safeContext}] PASSED: deterministic solvability validation succeeded.");
             return true;
         }
 
-        private static void ValidateColorCounts(ValidationSnapshot snapshot, List<string> errors)
+        private static void ValidateColorCountRule(Snapshot snapshot, List<string> failures)
         {
             HashSet<BlockColor> colors = new HashSet<BlockColor>(snapshot.PatternCounts.Keys);
             colors.UnionWith(snapshot.SelectionCounts.Keys);
@@ -58,49 +60,47 @@ namespace EliminateGame.Validation
 
                 int patternCount = snapshot.PatternCounts.GetValueOrDefault(color, 0);
                 int selectionCount = snapshot.SelectionCounts.GetValueOrDefault(color, 0);
-                int expectedPatternCount = selectionCount * 3;
+                int expected = selectionCount * 3;
 
-                if (patternCount != expectedPatternCount)
+                if (patternCount != expected)
                 {
-                    errors.Add($"Color count mismatch for {color}: PatternCount={patternCount}, SelectionCount={selectionCount}, Expected PatternCount=SelectionCount*3={expectedPatternCount}.");
+                    failures.Add($"Color count rule violation for {color}: PatternCount={patternCount}, SelectionCount={selectionCount}, expected PatternCount=SelectionCount*3={expected}.");
                 }
             }
         }
 
-        private static void ValidateInitialUnlocks(ValidationSnapshot snapshot, List<string> errors)
+        private static void ValidateStartUnlockReachability(Snapshot snapshot, List<string> failures)
         {
-            int initialUnlockedCount = snapshot.SelectionTiles.Count(tile => tile.StartUnlocked && tile.Color != BlockColor.None);
-            if (initialUnlockedCount <= 0)
-            {
-                errors.Add("SelectionArea has no initially unlocked non-None tile. First move is impossible.");
-            }
-        }
+            List<SelectionNode> sortedNodes = snapshot.Nodes.Values
+                .OrderBy(n => n.Position.y)
+                .ThenBy(n => n.Position.x)
+                .ToList();
 
-        private static void ValidateReachability(ValidationSnapshot snapshot, List<string> errors)
-        {
-            Dictionary<Vector2Int, SelectionNode> nodes = snapshot.SelectionNodes;
+            List<SelectionNode> startNodes = sortedNodes
+                .Where(n => n.StartUnlocked && n.Color != BlockColor.None)
+                .ToList();
+
+            if (startNodes.Count == 0)
+            {
+                failures.Add("SelectionArea has no StartUnlocked non-None tile.");
+                return;
+            }
+
             Queue<Vector2Int> queue = new Queue<Vector2Int>();
             HashSet<Vector2Int> visited = new HashSet<Vector2Int>();
 
-            foreach (SelectionNode node in nodes.Values)
+            foreach (SelectionNode start in startNodes)
             {
-                if (!node.StartUnlocked)
-                {
-                    continue;
-                }
-
-                if (visited.Add(node.Position))
-                {
-                    queue.Enqueue(node.Position);
-                }
+                visited.Add(start.Position);
+                queue.Enqueue(start.Position);
             }
 
             while (queue.Count > 0)
             {
                 Vector2Int current = queue.Dequeue();
-                foreach (Vector2Int neighbor in GetOrthogonalNeighbors(current))
+                foreach (Vector2Int neighbor in GetOrthogonalNeighborsOrdered(current))
                 {
-                    if (!nodes.ContainsKey(neighbor))
+                    if (!snapshot.Nodes.ContainsKey(neighbor))
                     {
                         continue;
                     }
@@ -112,48 +112,53 @@ namespace EliminateGame.Validation
                 }
             }
 
-            foreach (SelectionNode node in nodes.Values.OrderBy(n => n.Position.y).ThenBy(n => n.Position.x))
+            foreach (SelectionNode node in sortedNodes)
             {
                 if (!visited.Contains(node.Position))
                 {
-                    errors.Add($"SelectionArea tile unreachable by orthogonal unlock path: position=({node.Position.x},{node.Position.y}), color={node.Color}.");
+                    failures.Add($"Unreachable SelectionArea tile from StartUnlocked seeds: position=({node.Position.x},{node.Position.y}), color={node.Color}.");
                 }
             }
         }
 
-        private static void ValidateDeterministicPlayableSequence(ValidationSnapshot snapshot, List<string> errors)
+        private static void ValidatePlayableSequence(Snapshot snapshot, List<string> failures)
         {
-            SearchState initialState = SearchState.FromSnapshot(snapshot);
-            Queue<SearchState> open = new Queue<SearchState>();
+            SearchState initial = SearchState.FromSnapshot(snapshot);
+            Queue<SearchState> frontier = new Queue<SearchState>();
             HashSet<string> visited = new HashSet<string>();
 
-            open.Enqueue(initialState);
-            visited.Add(initialState.BuildKey());
+            frontier.Enqueue(initial);
+            visited.Add(initial.BuildKey());
 
-            int exploredNodes = 0;
-            string bestFailure = "No playable sequence found.";
+            int explored = 0;
+            string bestFailure = "No deterministic winning sequence found.";
 
-            while (open.Count > 0)
+            while (frontier.Count > 0)
             {
-                SearchState state = open.Dequeue();
-                exploredNodes++;
+                SearchState state = frontier.Dequeue();
+                explored++;
 
                 if (state.Pattern.IsEmpty())
                 {
-                    Debug.Log($"[SOLVABILITY_VALIDATION] Solvable sequence found. ExploredNodes={exploredNodes}, Sequence=[{string.Join(" -> ", state.MoveLog)}]");
                     return;
                 }
 
-                if (exploredNodes > MaxSearchNodes)
+                if (explored > MaxSearchNodes)
                 {
-                    errors.Add($"Solvability search exceeded MaxSearchNodes={MaxSearchNodes}. This level may be too complex for deterministic validation.");
+                    failures.Add($"Search safety limit reached: exploredNodes={explored}, MaxSearchNodes={MaxSearchNodes}.");
                     return;
                 }
 
-                List<SelectionNode> candidates = state.GetUnlockedRemainingTiles();
+                if (state.IsLoseState())
+                {
+                    bestFailure = "Encountered LOSE state (TempZone full and no color matches current Pattern bottom row).";
+                    continue;
+                }
+
+                List<SelectionNode> candidates = state.GetDeterministicUnlockedRemainingTiles();
                 if (candidates.Count == 0)
                 {
-                    bestFailure = "No unlocked SelectionArea tile remains before Pattern is empty.";
+                    bestFailure = "No unlocked SelectionArea choices remain before Pattern is empty.";
                     continue;
                 }
 
@@ -161,11 +166,11 @@ namespace EliminateGame.Validation
                 foreach (SelectionNode candidate in candidates)
                 {
                     SearchState next = state.Clone();
-                    PlayCandidate(next, candidate);
+                    SimulateSelection(next, candidate);
 
                     if (next.IsLoseState())
                     {
-                        bestFailure = $"Unavoidable deadlock candidate reached after selecting ({candidate.Position.x},{candidate.Position.y}) {candidate.Color}: TempZone full and no TempZone color matches current Pattern bottom row.";
+                        bestFailure = $"LOSE after selecting ({candidate.Position.x},{candidate.Position.y}) {candidate.Color}: TempZone full with no bottom-row color match.";
                         continue;
                     }
 
@@ -176,78 +181,78 @@ namespace EliminateGame.Validation
                     }
 
                     expanded = true;
-                    open.Enqueue(next);
+                    frontier.Enqueue(next);
                 }
 
-                if (!expanded && candidates.Count > 0)
+                if (!expanded)
                 {
-                    bestFailure = "All currently reachable branches repeat or lead to deadlock before Pattern is empty.";
+                    bestFailure = "All reachable deterministic branches either repeat previous states or end in LOSE.";
                 }
             }
 
-            errors.Add($"Playable sequence solvability failed. {bestFailure}");
+            failures.Add($"Playable sequence solvability failed. {bestFailure}");
         }
 
-        private static void PlayCandidate(SearchState state, SelectionNode candidate)
+        private static void SimulateSelection(SearchState state, SelectionNode candidate)
         {
             state.RemovedSelectionPositions.Add(candidate.Position);
             state.TempSlots.Add(new TempSlot(candidate.Color, 0));
             state.UnlockOrthogonalNeighbors(candidate.Position);
-            state.MoveLog.Add($"({candidate.Position.x},{candidate.Position.y}) {candidate.Color}");
 
-            ResolveColorChain(state, candidate.Color);
-            ResolveAutomaticChain(state);
+            int selectedSlotIndex = state.FindFirstTempSlotIndexByColor(candidate.Color);
+            if (selectedSlotIndex >= 0)
+            {
+                ResolveAgainstTempSlot(state, candidate.Color, selectedSlotIndex);
+            }
+
+            SimulateAutoResolveChain(state);
             CleanupStaleTempSlots(state);
         }
 
-        private static void ResolveColorChain(SearchState state, BlockColor color)
+        private static void SimulateAutoResolveChain(SearchState state)
         {
-            int slotIndex = state.FindFirstTempSlotIndexByColor(color);
-            if (slotIndex < 0)
+            for (int step = 0; step < AutoResolveSafetyLimit; step++)
             {
-                return;
-            }
+                if (state.Pattern.IsEmpty())
+                {
+                    return;
+                }
 
-            ResolveAgainstTempSlot(state, color, slotIndex);
-        }
-
-        private static void ResolveAutomaticChain(SearchState state)
-        {
-            int safety = 0;
-            while (safety < 128)
-            {
-                safety++;
                 HashSet<BlockColor> bottomColors = new HashSet<BlockColor>(state.Pattern.GetBottomRowColors());
                 if (bottomColors.Count == 0)
                 {
                     return;
                 }
 
-                int slotIndex = -1;
-                BlockColor color = BlockColor.None;
+                int matchingSlotIndex = -1;
+                BlockColor matchingColor = BlockColor.None;
                 for (int i = 0; i < state.TempSlots.Count; i++)
                 {
-                    if (bottomColors.Contains(state.TempSlots[i].Color))
+                    BlockColor slotColor = state.TempSlots[i].Color;
+                    if (!bottomColors.Contains(slotColor))
                     {
-                        slotIndex = i;
-                        color = state.TempSlots[i].Color;
-                        break;
+                        continue;
                     }
+
+                    matchingSlotIndex = i;
+                    matchingColor = slotColor;
+                    break;
                 }
 
-                if (slotIndex < 0)
+                if (matchingSlotIndex < 0)
                 {
                     return;
                 }
 
-                if (!ResolveAgainstTempSlot(state, color, slotIndex))
+                bool changed = ResolveAgainstTempSlot(state, matchingColor, matchingSlotIndex);
+                if (!changed)
                 {
                     return;
                 }
             }
         }
 
-        private static bool ResolveAgainstTempSlot(SearchState state, BlockColor color, int tempSlotIndex)
+        private static bool ResolveAgainstTempSlot(SearchState state, BlockColor color, int targetSlotIndex)
         {
             int bottomRowCount = state.Pattern.GetBottomRowCount(color);
             if (bottomRowCount <= 0)
@@ -262,11 +267,11 @@ namespace EliminateGame.Validation
                 return false;
             }
 
-            bool caseB = bottomRowCount >= 3 && sameColorTempCount >= 3;
-            if (caseB)
+            bool canCaseB = bottomRowCount >= 3 && sameColorTempCount >= 3;
+            if (canCaseB)
             {
-                int removed = 0;
-                for (int i = state.TempSlots.Count - 1; i >= 0 && removed < 3; i--)
+                int removedTemp = 0;
+                for (int i = state.TempSlots.Count - 1; i >= 0 && removedTemp < 3; i--)
                 {
                     if (state.TempSlots[i].Color != color)
                     {
@@ -274,23 +279,25 @@ namespace EliminateGame.Validation
                     }
 
                     state.TempSlots.RemoveAt(i);
-                    removed++;
+                    removedTemp++;
                 }
             }
             else
             {
-                if (tempSlotIndex >= 0 && tempSlotIndex < state.TempSlots.Count)
+                if (targetSlotIndex < 0 || targetSlotIndex >= state.TempSlots.Count)
                 {
-                    TempSlot slot = state.TempSlots[tempSlotIndex];
-                    slot.Progress = Mathf.Clamp(slot.Progress + removedFromPattern, 0, 3);
-                    if (slot.Progress >= 3)
-                    {
-                        state.TempSlots.RemoveAt(tempSlotIndex);
-                    }
-                    else
-                    {
-                        state.TempSlots[tempSlotIndex] = slot;
-                    }
+                    return true;
+                }
+
+                TempSlot slot = state.TempSlots[targetSlotIndex];
+                slot.Progress = Mathf.Clamp(slot.Progress + removedFromPattern, 0, 3);
+                if (slot.Progress >= 3)
+                {
+                    state.TempSlots.RemoveAt(targetSlotIndex);
+                }
+                else
+                {
+                    state.TempSlots[targetSlotIndex] = slot;
                 }
             }
 
@@ -309,12 +316,12 @@ namespace EliminateGame.Validation
             }
         }
 
-        private static IEnumerable<Vector2Int> GetOrthogonalNeighbors(Vector2Int position)
+        private static IEnumerable<Vector2Int> GetOrthogonalNeighborsOrdered(Vector2Int position)
         {
-            yield return new Vector2Int(position.x + 1, position.y);
-            yield return new Vector2Int(position.x - 1, position.y);
-            yield return new Vector2Int(position.x, position.y + 1);
             yield return new Vector2Int(position.x, position.y - 1);
+            yield return new Vector2Int(position.x - 1, position.y);
+            yield return new Vector2Int(position.x + 1, position.y);
+            yield return new Vector2Int(position.x, position.y + 1);
         }
 
         private struct TempSlot
@@ -336,19 +343,20 @@ namespace EliminateGame.Validation
             public bool StartUnlocked;
         }
 
-        private sealed class ValidationSnapshot
+        private sealed class Snapshot
         {
-            public readonly List<GameConfig.SelectionTileDefinition> SelectionTiles = new List<GameConfig.SelectionTileDefinition>();
-            public readonly Dictionary<Vector2Int, SelectionNode> SelectionNodes = new Dictionary<Vector2Int, SelectionNode>();
+            public readonly Dictionary<Vector2Int, SelectionNode> Nodes = new Dictionary<Vector2Int, SelectionNode>();
             public readonly Dictionary<BlockColor, int> PatternCounts = new Dictionary<BlockColor, int>();
             public readonly Dictionary<BlockColor, int> SelectionCounts = new Dictionary<BlockColor, int>();
             public readonly List<List<BlockColor>> PatternRows = new List<List<BlockColor>>();
             public int TempZoneCapacity;
 
-            public static ValidationSnapshot FromConfig(GameConfig config)
+            public static Snapshot FromConfig(GameConfig config)
             {
-                ValidationSnapshot snapshot = new ValidationSnapshot();
-                snapshot.TempZoneCapacity = config.TempZoneCapacity;
+                Snapshot snapshot = new Snapshot
+                {
+                    TempZoneCapacity = Mathf.Max(1, config.TempZoneCapacity)
+                };
 
                 foreach (GameConfig.PatternRowDefinition row in config.PatternRows)
                 {
@@ -365,7 +373,6 @@ namespace EliminateGame.Validation
                     snapshot.PatternRows.Add(copiedRow);
                 }
 
-                HashSet<Vector2Int> seen = new HashSet<Vector2Int>();
                 foreach (GameConfig.SelectionTileDefinition tile in config.SelectionTiles)
                 {
                     if (tile.Color == BlockColor.None)
@@ -374,14 +381,13 @@ namespace EliminateGame.Validation
                     }
 
                     Vector2Int position = new Vector2Int(tile.X, tile.Y);
-                    if (!seen.Add(position))
+                    if (snapshot.Nodes.ContainsKey(position))
                     {
                         continue;
                     }
 
-                    snapshot.SelectionTiles.Add(tile);
                     snapshot.SelectionCounts[tile.Color] = snapshot.SelectionCounts.GetValueOrDefault(tile.Color, 0) + 1;
-                    snapshot.SelectionNodes[position] = new SelectionNode
+                    snapshot.Nodes[position] = new SelectionNode
                     {
                         Position = position,
                         Color = tile.Color,
@@ -396,14 +402,13 @@ namespace EliminateGame.Validation
         private sealed class SearchState
         {
             public PatternState Pattern;
-            public readonly Dictionary<Vector2Int, SelectionNode> SelectionNodes = new Dictionary<Vector2Int, SelectionNode>();
+            public readonly Dictionary<Vector2Int, SelectionNode> Nodes = new Dictionary<Vector2Int, SelectionNode>();
             public readonly HashSet<Vector2Int> RemovedSelectionPositions = new HashSet<Vector2Int>();
             public readonly HashSet<Vector2Int> UnlockedPositions = new HashSet<Vector2Int>();
             public readonly List<TempSlot> TempSlots = new List<TempSlot>();
-            public readonly List<string> MoveLog = new List<string>();
             public int TempZoneCapacity;
 
-            public static SearchState FromSnapshot(ValidationSnapshot snapshot)
+            public static SearchState FromSnapshot(Snapshot snapshot)
             {
                 SearchState state = new SearchState
                 {
@@ -411,12 +416,12 @@ namespace EliminateGame.Validation
                     TempZoneCapacity = snapshot.TempZoneCapacity
                 };
 
-                foreach (KeyValuePair<Vector2Int, SelectionNode> pair in snapshot.SelectionNodes)
+                foreach (KeyValuePair<Vector2Int, SelectionNode> entry in snapshot.Nodes)
                 {
-                    state.SelectionNodes[pair.Key] = pair.Value;
-                    if (pair.Value.StartUnlocked)
+                    state.Nodes[entry.Key] = entry.Value;
+                    if (entry.Value.StartUnlocked)
                     {
-                        state.UnlockedPositions.Add(pair.Key);
+                        state.UnlockedPositions.Add(entry.Key);
                     }
                 }
 
@@ -431,9 +436,9 @@ namespace EliminateGame.Validation
                     TempZoneCapacity = TempZoneCapacity
                 };
 
-                foreach (KeyValuePair<Vector2Int, SelectionNode> pair in SelectionNodes)
+                foreach (KeyValuePair<Vector2Int, SelectionNode> entry in Nodes)
                 {
-                    clone.SelectionNodes[pair.Key] = pair.Value;
+                    clone.Nodes[entry.Key] = entry.Value;
                 }
 
                 foreach (Vector2Int position in RemovedSelectionPositions)
@@ -447,21 +452,20 @@ namespace EliminateGame.Validation
                 }
 
                 clone.TempSlots.AddRange(TempSlots);
-                clone.MoveLog.AddRange(MoveLog);
                 return clone;
             }
 
-            public List<SelectionNode> GetUnlockedRemainingTiles()
+            public List<SelectionNode> GetDeterministicUnlockedRemainingTiles()
             {
                 List<SelectionNode> result = new List<SelectionNode>();
-                foreach (Vector2Int position in UnlockedPositions.OrderBy(p => p.y).ThenBy(p => p.x))
+                foreach (Vector2Int pos in UnlockedPositions.OrderBy(p => p.y).ThenBy(p => p.x))
                 {
-                    if (RemovedSelectionPositions.Contains(position))
+                    if (RemovedSelectionPositions.Contains(pos))
                     {
                         continue;
                     }
 
-                    if (SelectionNodes.TryGetValue(position, out SelectionNode node))
+                    if (Nodes.TryGetValue(pos, out SelectionNode node))
                     {
                         result.Add(node);
                     }
@@ -470,11 +474,11 @@ namespace EliminateGame.Validation
                 return result;
             }
 
-            public void UnlockOrthogonalNeighbors(Vector2Int position)
+            public void UnlockOrthogonalNeighbors(Vector2Int from)
             {
-                foreach (Vector2Int neighbor in GetOrthogonalNeighbors(position))
+                foreach (Vector2Int neighbor in GetOrthogonalNeighborsOrdered(from))
                 {
-                    if (SelectionNodes.ContainsKey(neighbor))
+                    if (Nodes.ContainsKey(neighbor))
                     {
                         UnlockedPositions.Add(neighbor);
                     }
@@ -529,15 +533,9 @@ namespace EliminateGame.Validation
                 rows = sourceRows.Select(row => new List<BlockColor>(row)).ToList();
             }
 
-            public PatternState Clone()
-            {
-                return new PatternState(rows);
-            }
+            public PatternState Clone() => new PatternState(rows);
 
-            public bool IsEmpty()
-            {
-                return GetBottomRowIndex() < 0;
-            }
+            public bool IsEmpty() => GetBottomRowIndex() < 0;
 
             public bool ContainsColor(BlockColor color)
             {
@@ -551,39 +549,31 @@ namespace EliminateGame.Validation
 
             public List<BlockColor> GetBottomRowColors()
             {
-                int bottomIndex = GetBottomRowIndex();
-                if (bottomIndex < 0)
-                {
-                    return new List<BlockColor>();
-                }
-
-                return rows[bottomIndex].Where(color => color != BlockColor.None).ToList();
+                int bottom = GetBottomRowIndex();
+                return bottom < 0
+                    ? new List<BlockColor>()
+                    : rows[bottom].Where(c => c != BlockColor.None).ToList();
             }
 
             public int GetBottomRowCount(BlockColor color)
             {
-                int bottomIndex = GetBottomRowIndex();
-                if (bottomIndex < 0)
-                {
-                    return 0;
-                }
-
-                return rows[bottomIndex].Count(cell => cell == color);
+                int bottom = GetBottomRowIndex();
+                return bottom < 0 ? 0 : rows[bottom].Count(c => c == color);
             }
 
             public int ResolveAgainstBottomRow(BlockColor color)
             {
-                int bottomIndex = GetBottomRowIndex();
-                if (bottomIndex < 0)
+                int bottom = GetBottomRowIndex();
+                if (bottom < 0)
                 {
                     return 0;
                 }
 
-                List<BlockColor> bottomRow = rows[bottomIndex];
+                List<BlockColor> row = rows[bottom];
                 List<int> indices = new List<int>();
-                for (int i = 0; i < bottomRow.Count; i++)
+                for (int i = 0; i < row.Count; i++)
                 {
-                    if (bottomRow[i] == color)
+                    if (row[i] == color)
                     {
                         indices.Add(i);
                     }
@@ -597,106 +587,106 @@ namespace EliminateGame.Validation
                 int removeCount = indices.Count < 3 ? indices.Count : 3;
                 for (int i = 0; i < removeCount; i++)
                 {
-                    bottomRow[indices[i]] = BlockColor.None;
+                    row[indices[i]] = BlockColor.None;
                 }
 
-                ApplyColumnGravity();
-                CollapseIfNeeded();
+                ApplyColumnGravityOnly();
+                CollapseEmptyRows();
                 return removeCount;
             }
 
             public string BuildKey()
             {
-                return string.Join("/", rows.Select(row => string.Join(",", row.Select(color => ((int)color).ToString()))));
+                return string.Join("/", rows.Select(row => string.Join(",", row.Select(c => ((int)c).ToString()))));
             }
 
             private int GetBottomRowIndex()
             {
-                for (int rowIndex = rows.Count - 1; rowIndex >= 0; rowIndex--)
+                for (int r = rows.Count - 1; r >= 0; r--)
                 {
-                    if (rows[rowIndex].Any(color => color != BlockColor.None))
+                    if (rows[r].Any(c => c != BlockColor.None))
                     {
-                        return rowIndex;
+                        return r;
                     }
                 }
 
                 return -1;
             }
 
-            private void ApplyColumnGravity()
+            private void ApplyColumnGravityOnly()
             {
-                int maxColumnCount = rows.Count > 0 ? rows.Max(row => row.Count) : 0;
-                for (int colIndex = 0; colIndex < maxColumnCount; colIndex++)
+                int maxCols = rows.Count == 0 ? 0 : rows.Max(r => r.Count);
+                for (int x = 0; x < maxCols; x++)
                 {
                     bool moved;
                     do
                     {
                         moved = false;
-                        for (int rowIndex = rows.Count - 1; rowIndex >= 0; rowIndex--)
+                        for (int y = rows.Count - 1; y >= 0; y--)
                         {
-                            if (!TryGetCell(rowIndex, colIndex, out BlockColor targetColor) || targetColor != BlockColor.None)
+                            if (!TryGetCell(y, x, out BlockColor current) || current != BlockColor.None)
                             {
                                 continue;
                             }
 
-                            int sourceRowIndex = FindNearestNonEmptyRowAbove(rowIndex, colIndex);
-                            if (sourceRowIndex < 0)
+                            int src = FindNearestNonEmptyAbove(y, x);
+                            if (src < 0)
                             {
                                 continue;
                             }
 
-                            rows[rowIndex][colIndex] = rows[sourceRowIndex][colIndex];
-                            rows[sourceRowIndex][colIndex] = BlockColor.None;
+                            rows[y][x] = rows[src][x];
+                            rows[src][x] = BlockColor.None;
                             moved = true;
                         }
                     } while (moved);
                 }
             }
 
-            private bool TryGetCell(int rowIndex, int colIndex, out BlockColor color)
+            private void CollapseEmptyRows()
+            {
+                for (int i = rows.Count - 1; i >= 0; i--)
+                {
+                    if (rows[i].All(c => c == BlockColor.None))
+                    {
+                        rows.RemoveAt(i);
+                    }
+                }
+            }
+
+            private bool TryGetCell(int y, int x, out BlockColor color)
             {
                 color = BlockColor.None;
-                if (rowIndex < 0 || rowIndex >= rows.Count)
+                if (y < 0 || y >= rows.Count)
                 {
                     return false;
                 }
 
-                if (colIndex < 0 || colIndex >= rows[rowIndex].Count)
+                if (x < 0 || x >= rows[y].Count)
                 {
                     return false;
                 }
 
-                color = rows[rowIndex][colIndex];
+                color = rows[y][x];
                 return true;
             }
 
-            private int FindNearestNonEmptyRowAbove(int rowIndex, int colIndex)
+            private int FindNearestNonEmptyAbove(int y, int x)
             {
-                for (int aboveRowIndex = rowIndex - 1; aboveRowIndex >= 0; aboveRowIndex--)
+                for (int r = y - 1; r >= 0; r--)
                 {
-                    if (!TryGetCell(aboveRowIndex, colIndex, out BlockColor color))
+                    if (!TryGetCell(r, x, out BlockColor color))
                     {
                         continue;
                     }
 
                     if (color != BlockColor.None)
                     {
-                        return aboveRowIndex;
+                        return r;
                     }
                 }
 
                 return -1;
-            }
-
-            private void CollapseIfNeeded()
-            {
-                for (int i = rows.Count - 1; i >= 0; i--)
-                {
-                    if (rows[i].All(color => color == BlockColor.None))
-                    {
-                        rows.RemoveAt(i);
-                    }
-                }
             }
         }
     }
