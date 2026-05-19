@@ -331,7 +331,9 @@ namespace EliminateGame.Core
             Debug.Log($"[RESOLVE_DEBUG] ResolveAgainstTempSlot beforeResolve selectedColor={selectedColor} tempSlotIndex={tempSlotIndex}");
             AssertGameRuntimeSafety("ResolveAgainstTempSlot.BeforePatternResolve", selectedColor, tempSlotIndex);
             Dictionary<BlockColor, int> beforeCounts = BuildPatternAndTempZoneColorCounts();
-            PatternResolveResult result = patternController.ResolveAgainstBottomRow(selectedColor);
+            PatternResolveResult result = (bottomRowCount >= 3 && !canExecuteCaseB)
+                ? patternController.ResolveAgainstBottomRowAsCaseA(selectedColor)
+                : patternController.ResolveAgainstBottomRow(selectedColor);
             Debug.Log($"[RESOLVE_DEBUG] ResolveAgainstTempSlot afterResolve matched={result.Matched} isCaseA={result.IsCaseA} patternRemovedCount={result.PatternRemovedCount}");
             if (!result.Matched)
             {
@@ -348,16 +350,7 @@ namespace EliminateGame.Core
                 return true;
             }
 
-            if (!canExecuteCaseB)
-            {
-                Debug.LogWarning($"Unexpected Case B resolve for {selectedColor} while unavailable. Preserving resolve chain by applying Case A progress.");
-                tempZoneController.ApplyCaseAProgress(tempSlotIndex, result.PatternRemovedCount);
-                Dictionary<BlockColor, int> afterCaseACounts = BuildPatternAndTempZoneColorCounts();
-                AssertColorConsistencyAfterResolve(beforeCounts, afterCaseACounts, selectedColor, result.PatternRemovedCount, "ResolveAgainstTempSlot.AfterCaseA");
-                AssertGameRuntimeSafety("ResolveAgainstTempSlot.AfterCaseA", selectedColor, tempSlotIndex);
-                CleanupStaleTempZoneSlotsAfterPatternUpdate();
-                return true;
-            }
+            Debug.Assert(canExecuteCaseB, $"[SAFETY][GameManager] Case B resolve reached without valid precondition for color={selectedColor}. BottomRowCount={bottomRowCount}, TempCount={sameColorCountInTemp}.");
 
             tempZoneController.RemoveByColor(selectedColor, 3);
             Dictionary<BlockColor, int> afterCaseBCounts = BuildPatternAndTempZoneColorCounts();
