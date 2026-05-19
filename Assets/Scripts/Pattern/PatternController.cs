@@ -147,55 +147,6 @@ namespace EliminateGame.Pattern
             return patternRows[bottomIndex].Count(c => c.Color == color);
         }
 
-
-        public PatternResolveResult ResolveAgainstBottomRowAsCaseA(BlockColor color)
-        {
-            int bottomIndex = GetBottomRowIndex();
-            if (bottomIndex < 0)
-            {
-                comboCount = 0;
-                return PatternResolveResult.NoMatch();
-            }
-
-            int nonNoneBeforeResolve = GetNonNoneCellCount();
-            SCG.List<PatternCell> bottomRow = patternRows[bottomIndex];
-            string bottomBefore = string.Join(",", bottomRow.Select(cell => cell.Color));
-            SCG.List<int> colorIndices = new SCG.List<int>();
-
-            for (int i = 0; i < bottomRow.Count; i++)
-            {
-                if (bottomRow[i].Color == color)
-                {
-                    colorIndices.Add(i);
-                }
-            }
-
-            Debug.Log($"[RESOLVE_DEBUG] Pattern.ResolveAgainstBottomRowAsCaseA inputColor={color} bottomRowIndex={bottomIndex} bottomRowBefore=[{bottomBefore}] colorIndicesCount={colorIndices.Count}");
-
-            if (colorIndices.Count == 0)
-            {
-                comboCount = 0;
-                return PatternResolveResult.NoMatch();
-            }
-
-            SCG.List<RemovedCellInfo> removedCells = CaptureRemovedCells(bottomIndex, bottomRow, colorIndices);
-            SetCellsToNone(bottomRow, colorIndices);
-            comboCount++;
-            CameraShake.Instance?.ShakeWithCombo(comboCount);
-            SfxController.Instance?.PlayPatternHit(comboCount);
-            SCG.List<GravityMove> caseAGravityMoves = ApplyColumnGravity();
-            CollapseIfNeeded();
-            RefreshVisuals(true, caseAGravityMoves);
-            SpawnGhosts(removedCells, comboCount);
-            int postCaseABottomIndex = GetBottomRowIndex();
-            string postCaseABottomRow = postCaseABottomIndex >= 0
-                ? string.Join(",", patternRows[postCaseABottomIndex].Select(cell => cell.Color))
-                : "<empty>";
-            Debug.Log($"[RESOLVE_DEBUG] Pattern.ResolveAgainstBottomRowAsCaseA case=CaseA bottomRowAfterResolve=[{postCaseABottomRow}] bottomRowAfterGravityCollapse=[{string.Join(",", GetBottomRowColors())}]");
-            Debug.Log($"Pattern Case A resolved for {color}. Removed={colorIndices.Count} from bottom row.");
-            AssertResolvedNonNoneCount(color, nonNoneBeforeResolve - colorIndices.Count, colorIndices.Count);
-            return PatternResolveResult.CaseA(colorIndices.Count);
-        }
         public PatternResolveResult ResolveAgainstBottomRow(BlockColor color)
         {
             int bottomIndex = GetBottomRowIndex();
@@ -228,7 +179,23 @@ namespace EliminateGame.Pattern
 
             if (colorIndices.Count < 3)
             {
-                return ResolveAgainstBottomRowAsCaseA(color);
+                SCG.List<RemovedCellInfo> removedCells = CaptureRemovedCells(bottomIndex, bottomRow, colorIndices);
+                SetCellsToNone(bottomRow, colorIndices);
+                comboCount++;
+                CameraShake.Instance?.ShakeWithCombo(comboCount);
+                SfxController.Instance?.PlayPatternHit(comboCount);
+                SCG.List<GravityMove> caseAGravityMoves = ApplyColumnGravity();
+                CollapseIfNeeded();
+                RefreshVisuals(true, caseAGravityMoves);
+                SpawnGhosts(removedCells, comboCount);
+                int postCaseABottomIndex = GetBottomRowIndex();
+                string postCaseABottomRow = postCaseABottomIndex >= 0
+                    ? string.Join(",", patternRows[postCaseABottomIndex].Select(cell => cell.Color))
+                    : "<empty>";
+                Debug.Log($"[RESOLVE_DEBUG] Pattern.ResolveAgainstBottomRow case=CaseA bottomRowAfterResolve=[{postCaseABottomRow}] bottomRowAfterGravityCollapse=[{string.Join(",", GetBottomRowColors())}]");
+                Debug.Log($"Pattern Case A resolved for {color}. Removed={colorIndices.Count} from bottom row.");
+                AssertResolvedNonNoneCount(color, nonNoneBeforeResolve - colorIndices.Count, colorIndices.Count);
+                return PatternResolveResult.CaseA(colorIndices.Count);
             }
 
             SCG.List<int> firstThree = colorIndices.Take(3).ToList();
