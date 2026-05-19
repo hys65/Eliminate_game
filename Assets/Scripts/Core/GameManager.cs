@@ -335,7 +335,10 @@ namespace EliminateGame.Core
             Debug.Log($"[RESOLVE_DEBUG] ResolveAgainstTempSlot beforeResolve selectedColor={selectedColor} tempSlotIndex={tempSlotIndex}");
             AssertGameRuntimeSafety("ResolveAgainstTempSlot.BeforePatternResolve", selectedColor, tempSlotIndex);
             Dictionary<BlockColor, int> beforeCounts = BuildPatternAndTempZoneColorCounts();
-            PatternResolveResult result = patternController.ResolveAgainstBottomRow(selectedColor);
+            bool isForcedCaseAFallback = bottomRowCount >= 3 && !canExecuteCaseB;
+            PatternResolveResult result = isForcedCaseAFallback
+                ? patternController.ResolveAgainstBottomRowForcedCaseA(selectedColor)
+                : patternController.ResolveAgainstBottomRow(selectedColor);
             string patternCountsAfterPatternResolve = FormatColorCounts(patternController.GetNonNoneColorCounts());
             string tempSlotsBeforeMutation = FormatTempSlots();
             Debug.Log(
@@ -352,7 +355,8 @@ namespace EliminateGame.Core
                 Dictionary<BlockColor, int> afterCaseACounts = BuildPatternAndTempZoneColorCounts();
                 AssertColorConsistencyAfterResolve(beforeCounts, afterCaseACounts, selectedColor, result.PatternRemovedCount, "ResolveAgainstTempSlot.AfterCaseA");
                 AssertGameRuntimeSafety("ResolveAgainstTempSlot.AfterCaseA", selectedColor, tempSlotIndex);
-                Debug.Log($"[COUNT_TRACE] AfterTempMutation branch=GameManager.CaseAProgress patternCountsAfterBranch={FormatColorCounts(patternController.GetNonNoneColorCounts())} tempSlotsAfterBranch={FormatTempSlots()}");
+                string caseABranch = isForcedCaseAFallback ? "ForcedCaseAFallback" : "GameManager.CaseAProgress";
+                Debug.Log($"[COUNT_TRACE] AfterTempMutation branch={caseABranch} patternCountsAfterBranch={FormatColorCounts(patternController.GetNonNoneColorCounts())} tempSlotsAfterBranch={FormatTempSlots()}");
                 CleanupStaleTempZoneSlotsAfterPatternUpdate();
                 return true;
             }
