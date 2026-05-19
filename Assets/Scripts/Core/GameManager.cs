@@ -95,6 +95,7 @@ namespace EliminateGame.Core
             selectionAreaGridController.TileSelected += OnSelectionAreaTileSelected;
 
             Debug.Log("Game run started.");
+            Debug.Log($"[INVARIANT_TRACE] Stage=StartRun.AfterInitialize selectionRemaining={FormatSelectionRemainingCounts()} report={BuildRemainingInvariantReport()}");
             AssertGameRuntimeSafety("StartRun");
             EvaluateStateAfterAction();
         }
@@ -173,7 +174,9 @@ namespace EliminateGame.Core
             Debug.Log($"[RESOLVE_DEBUG] OnSelectionAreaTileSelected tempZoneCountAfterAdd={tempZoneController.Count} addedSlotIndex={tempSlotIndex}");
 
             AssertGameRuntimeSafety("OnSelectionAreaTileSelected.BeforeConsume", tile.Color, tempSlotIndex);
+            Debug.Log($"[INVARIANT_TRACE] Stage=OnSelectionAreaTileSelected.BeforeConsume selectionRemaining={FormatSelectionRemainingCounts()} report={BuildRemainingInvariantReport()}");
             selectionAreaGridController.ConsumeTileAndUnlockCrossNeighbors(tile);
+            Debug.Log($"[INVARIANT_TRACE] Stage=OnSelectionAreaTileSelected.AfterConsume selectionRemaining={FormatSelectionRemainingCounts()} report={BuildRemainingInvariantReport()}");
             ResolvePatternUsingTempZoneChain(tile.Color, tempSlotIndex);
             AssertGameRuntimeSafety("OnSelectionAreaTileSelected.AfterResolve", tile.Color, tempSlotIndex, validateSlotIndex: false);
             EvaluateStateAfterAction();
@@ -333,6 +336,7 @@ namespace EliminateGame.Core
             Debug.Log(
                 $"[COUNT_TRACE] BeforePatternResolve selectedColor={selectedColor} tempSlotIndex={tempSlotIndex} bottomRowCount={bottomRowCount} sameColorCountInTemp={sameColorCountInTemp} canExecuteCaseB={canExecuteCaseB} patternCountsBefore={patternCountsBefore} tempSlotsBefore={tempSlotsBefore}");
             Debug.Log($"[RESOLVE_DEBUG] ResolveAgainstTempSlot beforeResolve selectedColor={selectedColor} tempSlotIndex={tempSlotIndex}");
+            Debug.Log($"[INVARIANT_TRACE] Stage=ResolveAgainstTempSlot.BeforePatternResolve selectedColor={selectedColor} selectionRemaining={FormatSelectionRemainingCounts()} report={BuildRemainingInvariantReport()}");
             AssertGameRuntimeSafety("ResolveAgainstTempSlot.BeforePatternResolve", selectedColor, tempSlotIndex);
             Dictionary<BlockColor, int> beforeCounts = BuildPatternAndTempZoneColorCounts();
             bool isForcedCaseAFallback = bottomRowCount >= 3 && !canExecuteCaseB;
@@ -344,6 +348,7 @@ namespace EliminateGame.Core
             Debug.Log(
                 $"[COUNT_TRACE] AfterPatternResolve resultMatched={result.Matched} resultIsCaseA={result.IsCaseA} resultPatternRemovedCount={result.PatternRemovedCount} patternCountsAfterPatternResolve={patternCountsAfterPatternResolve} tempSlotsBeforeTempMutation={tempSlotsBeforeMutation}");
             Debug.Log($"[RESOLVE_DEBUG] ResolveAgainstTempSlot afterResolve matched={result.Matched} isCaseA={result.IsCaseA} patternRemovedCount={result.PatternRemovedCount}");
+            Debug.Log($"[INVARIANT_TRACE] Stage=ResolveAgainstTempSlot.AfterPatternResolve selectedColor={selectedColor} selectionRemaining={FormatSelectionRemainingCounts()} report={BuildRemainingInvariantReport()}");
             if (!result.Matched)
             {
                 return false;
@@ -357,6 +362,7 @@ namespace EliminateGame.Core
                 AssertGameRuntimeSafety("ResolveAgainstTempSlot.AfterCaseA", selectedColor, tempSlotIndex);
                 string caseABranch = isForcedCaseAFallback ? "ForcedCaseAFallback" : "GameManager.CaseAProgress";
                 Debug.Log($"[COUNT_TRACE] AfterTempMutation branch={caseABranch} patternCountsAfterBranch={FormatColorCounts(patternController.GetNonNoneColorCounts())} tempSlotsAfterBranch={FormatTempSlots()}");
+                Debug.Log($"[INVARIANT_TRACE] Stage=ResolveAgainstTempSlot.AfterTempMutation branch={caseABranch} selectedColor={selectedColor} selectionRemaining={FormatSelectionRemainingCounts()} report={BuildRemainingInvariantReport()}");
                 CleanupStaleTempZoneSlotsAfterPatternUpdate();
                 return true;
             }
@@ -369,6 +375,7 @@ namespace EliminateGame.Core
                 AssertColorConsistencyAfterResolve(beforeCounts, afterCaseACounts, selectedColor, result.PatternRemovedCount, "ResolveAgainstTempSlot.AfterCaseA");
                 AssertGameRuntimeSafety("ResolveAgainstTempSlot.AfterCaseA", selectedColor, tempSlotIndex);
                 Debug.Log($"[COUNT_TRACE] AfterTempMutation branch=GameManager.UnexpectedCaseBFallbackToCaseAProgress patternCountsAfterBranch={FormatColorCounts(patternController.GetNonNoneColorCounts())} tempSlotsAfterBranch={FormatTempSlots()}");
+                Debug.Log($"[INVARIANT_TRACE] Stage=ResolveAgainstTempSlot.AfterTempMutation branch=GameManager.UnexpectedCaseBFallbackToCaseAProgress selectedColor={selectedColor} selectionRemaining={FormatSelectionRemainingCounts()} report={BuildRemainingInvariantReport()}");
                 CleanupStaleTempZoneSlotsAfterPatternUpdate();
                 return true;
             }
@@ -378,6 +385,7 @@ namespace EliminateGame.Core
             AssertColorConsistencyAfterResolve(beforeCounts, afterCaseBCounts, selectedColor, result.PatternRemovedCount + 3, "ResolveAgainstTempSlot.AfterCaseB");
             AssertGameRuntimeSafety("ResolveAgainstTempSlot.AfterCaseB", selectedColor, tempSlotIndex);
             Debug.Log($"[COUNT_TRACE] AfterTempMutation branch=GameManager.CaseBRemoveThree patternCountsAfterBranch={FormatColorCounts(patternController.GetNonNoneColorCounts())} tempSlotsAfterBranch={FormatTempSlots()}");
+            Debug.Log($"[INVARIANT_TRACE] Stage=ResolveAgainstTempSlot.AfterTempMutation branch=GameManager.CaseBRemoveThree selectedColor={selectedColor} selectionRemaining={FormatSelectionRemainingCounts()} report={BuildRemainingInvariantReport()}");
             CleanupStaleTempZoneSlotsAfterPatternUpdate();
             return true;
         }
@@ -387,6 +395,7 @@ namespace EliminateGame.Core
         {
             tempZoneController.RemoveSlotsWhereColorNoLongerExists(patternController.ContainsColor);
             Debug.Log($"[COUNT_TRACE] AfterCleanup patternCountsAfterCleanup={FormatColorCounts(patternController.GetNonNoneColorCounts())} tempSlotsAfterCleanup={FormatTempSlots()}");
+            Debug.Log($"[INVARIANT_TRACE] Stage=ResolveAgainstTempSlot.AfterStaleCleanup selectionRemaining={FormatSelectionRemainingCounts()} report={BuildRemainingInvariantReport()}");
         }
 
         private string FormatColorCounts(Dictionary<BlockColor, int> counts)
@@ -411,6 +420,86 @@ namespace EliminateGame.Core
             }
 
             return string.Join(" | ", tempZoneController.Slots.Select((slot, idx) => $"[{idx}] {slot.Color} p={slot.ProgressMark}"));
+        }
+
+        private string FormatSelectionRemainingCounts()
+        {
+            Dictionary<BlockColor, int> selectionCounts = selectionAreaGridController != null
+                ? selectionAreaGridController.GetRemainingNonRemovedColorCounts()
+                : null;
+
+            return FormatColorCounts(selectionCounts);
+        }
+
+        private string BuildRemainingInvariantReport()
+        {
+            Dictionary<BlockColor, int> patternCounts = patternController != null
+                ? patternController.GetNonNoneColorCounts()
+                : new Dictionary<BlockColor, int>();
+            Dictionary<BlockColor, int> selectionCounts = selectionAreaGridController != null
+                ? selectionAreaGridController.GetRemainingNonRemovedColorCounts()
+                : new Dictionary<BlockColor, int>();
+
+            var allColors = new HashSet<BlockColor>();
+            foreach (KeyValuePair<BlockColor, int> pair in patternCounts)
+            {
+                if (pair.Key != BlockColor.None && pair.Value > 0)
+                {
+                    allColors.Add(pair.Key);
+                }
+            }
+
+            foreach (KeyValuePair<BlockColor, int> pair in selectionCounts)
+            {
+                if (pair.Key != BlockColor.None && pair.Value > 0)
+                {
+                    allColors.Add(pair.Key);
+                }
+            }
+
+            if (tempZoneController != null && tempZoneController.Slots != null)
+            {
+                foreach (TempZoneSlot slot in tempZoneController.Slots)
+                {
+                    if (slot.Color != BlockColor.None)
+                    {
+                        allColors.Add(slot.Color);
+                    }
+                }
+            }
+
+            if (allColors.Count == 0)
+            {
+                return "<empty>";
+            }
+
+            IEnumerable<string> reports = allColors
+                .OrderBy(color => color.ToString())
+                .Select(color =>
+                {
+                    int patternRemaining = patternCounts.GetValueOrDefault(color, 0);
+                    int selectionRemaining = selectionCounts.GetValueOrDefault(color, 0);
+                    int tempDebt = 0;
+                    if (tempZoneController != null && tempZoneController.Slots != null)
+                    {
+                        for (int i = 0; i < tempZoneController.Slots.Count; i++)
+                        {
+                            TempZoneSlot slot = tempZoneController.Slots[i];
+                            if (slot.Color != color)
+                            {
+                                continue;
+                            }
+
+                            tempDebt += 3 - slot.ProgressMark;
+                        }
+                    }
+
+                    int expectedPatternRemaining = (selectionRemaining * 3) + tempDebt;
+                    int delta = patternRemaining - expectedPatternRemaining;
+                    return $"Color={color} Pattern={patternRemaining} SelectionRemaining={selectionRemaining} TempDebt={tempDebt} ExpectedPattern={expectedPatternRemaining} Delta={delta}";
+                });
+
+            return string.Join(" || ", reports);
         }
 
         private void EvaluateStateAfterAction()
@@ -440,6 +529,7 @@ namespace EliminateGame.Core
             }
 
             Debug.Log($"Game running. PatternBottom=[{string.Join(",", bottomRow)}], TempCount={tempZoneController.Count}/{tempZoneController.Capacity}, Rescue={rescueUses}/{gameConfig.MaxRescueUses}");
+            Debug.Log($"[INVARIANT_TRACE] Stage=EvaluateStateAfterAction.Running selectionRemaining={FormatSelectionRemainingCounts()} report={BuildRemainingInvariantReport()}");
         }
 
         private void OnGUI()

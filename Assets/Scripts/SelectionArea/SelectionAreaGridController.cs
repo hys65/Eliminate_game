@@ -88,6 +88,24 @@ namespace EliminateGame.SelectionArea
             return count;
         }
 
+
+        public Dictionary<BlockColor, int> GetRemainingNonRemovedColorCounts()
+        {
+            var counts = new Dictionary<BlockColor, int>();
+
+            foreach (SelectionTile tile in tiles.Values)
+            {
+                if (tile == null || tile.IsRemoved || tile.Color == BlockColor.None)
+                {
+                    continue;
+                }
+
+                counts[tile.Color] = counts.GetValueOrDefault(tile.Color, 0) + 1;
+            }
+
+            return counts;
+        }
+
         private void HandleTileClicked(SelectionTile tile)
         {
             Debug.Log($"HandleTileClicked: ({tile.X},{tile.Y}) {tile.Color}");
