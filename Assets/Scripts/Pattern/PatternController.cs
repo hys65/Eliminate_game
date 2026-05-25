@@ -160,26 +160,35 @@ namespace EliminateGame.Pattern
             int nonNoneBeforeResolve = GetNonNoneCellCount();
             SCG.List<PatternCell> bottomRow = patternRows[bottomIndex];
             string bottomBefore = string.Join(",", bottomRow.Select(cell => cell.Color));
-            SCG.List<int> matchingIndices = new SCG.List<int>();
 
+            SCG.List<(int column, BlockColor color)> bottomRowSnapshot = new SCG.List<(int column, BlockColor color)>(bottomRow.Count);
             for (int i = 0; i < bottomRow.Count; i++)
             {
-                if (bottomRow[i].Color == color)
+                bottomRowSnapshot.Add((i, bottomRow[i].Color));
+            }
+
+            SCG.List<int> matchingCellsToRemove = new SCG.List<int>();
+            for (int i = 0; i < bottomRowSnapshot.Count; i++)
+            {
+                if (bottomRowSnapshot[i].color == color)
                 {
-                    matchingIndices.Add(i);
+                    matchingCellsToRemove.Add(bottomRowSnapshot[i].column);
                 }
             }
 
-            Debug.Log($"[RESOLVE_DEBUG] Pattern.ResolveAgainstBottomRowForcedCaseA inputColor={color} bottomRowIndex={bottomIndex} bottomRowBefore=[{bottomBefore}] matchingCount={matchingIndices.Count}");
+            Debug.Log($"[RESOLVE_DEBUG] Pattern.ResolveAgainstBottomRowForcedCaseA inputColor={color} bottomRowIndex={bottomIndex} bottomRowBefore=[{bottomBefore}] matchingCount={matchingCellsToRemove.Count}");
 
-            if (matchingIndices.Count == 0)
+            if (matchingCellsToRemove.Count == 0)
             {
                 comboCount = 0;
                 return PatternResolveResult.NoMatch();
             }
 
-            SCG.List<RemovedCellInfo> removedCells = CaptureRemovedCells(bottomIndex, bottomRow, matchingIndices);
-            SetCellsToNone(bottomRow, matchingIndices);
+            SCG.List<RemovedCellInfo> removedCells = CaptureRemovedCells(bottomIndex, bottomRow, matchingCellsToRemove);
+            SetCellsToNone(bottomRow, matchingCellsToRemove);
+            int removedCount = matchingCellsToRemove.Count;
+            Debug.Log($"[CHAIN_TRACE] ForcedCaseAFallback snapshotRemovedCount={removedCount}");
+
             comboCount++;
             CameraShake.Instance?.ShakeWithCombo(comboCount);
             SfxController.Instance?.PlayPatternHit(comboCount);
@@ -187,14 +196,15 @@ namespace EliminateGame.Pattern
             CollapseIfNeeded();
             RefreshVisuals(true, gravityMoves);
             SpawnGhosts(removedCells, comboCount);
+
             int postBottomIndex = GetBottomRowIndex();
             string postBottomRow = postBottomIndex >= 0
                 ? string.Join(",", patternRows[postBottomIndex].Select(cell => cell.Color))
                 : "<empty>";
             Debug.Log($"[RESOLVE_DEBUG] Pattern.ResolveAgainstBottomRowForcedCaseA case=CaseA bottomRowAfterResolve=[{postBottomRow}] bottomRowAfterGravityCollapse=[{string.Join(",", GetBottomRowColors())}]");
-            Debug.Log($"Pattern Forced Case A resolved for {color}. Removed={matchingIndices.Count} from bottom row.");
-            AssertResolvedNonNoneCount(color, nonNoneBeforeResolve - matchingIndices.Count, matchingIndices.Count);
-            return PatternResolveResult.CaseA(matchingIndices.Count);
+            Debug.Log($"Pattern Forced Case A resolved for {color}. Removed={removedCount} from bottom row.");
+            AssertResolvedNonNoneCount(color, nonNoneBeforeResolve - removedCount, removedCount);
+            return PatternResolveResult.CaseA(removedCount);
         }
 
         public PatternResolveResult ResolveAgainstBottomRow(BlockColor color)
