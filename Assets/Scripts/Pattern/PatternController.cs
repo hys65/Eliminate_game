@@ -167,27 +167,28 @@ namespace EliminateGame.Pattern
                 bottomRowSnapshot.Add((i, bottomRow[i].Color));
             }
 
-            SCG.List<int> matchingCellsToRemove = new SCG.List<int>();
+            SCG.List<int> matchingIndices = new SCG.List<int>();
             for (int i = 0; i < bottomRowSnapshot.Count; i++)
             {
                 if (bottomRowSnapshot[i].color == color)
                 {
-                    matchingCellsToRemove.Add(bottomRowSnapshot[i].column);
+                    matchingIndices.Add(bottomRowSnapshot[i].column);
                 }
             }
 
-            Debug.Log($"[RESOLVE_DEBUG] Pattern.ResolveAgainstBottomRowForcedCaseA inputColor={color} bottomRowIndex={bottomIndex} bottomRowBefore=[{bottomBefore}] matchingCount={matchingCellsToRemove.Count}");
+            Debug.Log($"[RESOLVE_DEBUG] Pattern.ResolveAgainstBottomRowForcedCaseA inputColor={color} bottomRowIndex={bottomIndex} bottomRowBefore=[{bottomBefore}] matchingCount={matchingIndices.Count}");
 
-            if (matchingCellsToRemove.Count == 0)
+            if (matchingIndices.Count == 0)
             {
                 comboCount = 0;
                 return PatternResolveResult.NoMatch();
             }
 
+            SCG.List<int> matchingCellsToRemove = matchingIndices.Take(3).ToList();
             SCG.List<RemovedCellInfo> removedCells = CaptureRemovedCells(bottomIndex, bottomRow, matchingCellsToRemove);
             SetCellsToNone(bottomRow, matchingCellsToRemove);
             int removedCount = matchingCellsToRemove.Count;
-            Debug.Log($"[CHAIN_TRACE] ForcedCaseAFallback snapshotRemovedCount={removedCount}");
+            Debug.Log($"[CHAIN_TRACE] ForcedCaseAFallback cappedRemovedCount={removedCount} originalMatchCount={matchingIndices.Count}");
 
             comboCount++;
             CameraShake.Instance?.ShakeWithCombo(comboCount);
