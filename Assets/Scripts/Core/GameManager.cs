@@ -29,7 +29,7 @@ namespace EliminateGame.Core
 
         private System.Random rescueRandom;
         private int rescueUses;
-        private bool stopCurrentAutoResolveChain;
+        private readonly HashSet<TempZoneSlot> resolvedTempSlotsThisChain = new HashSet<TempZoneSlot>();
         private GUIStyle stateLabelStyle;
         private GUIStyle restartButtonStyle;
         private bool isMenuOpen;
@@ -185,14 +185,8 @@ namespace EliminateGame.Core
 
         private void ResolvePatternUsingTempZoneChain(BlockColor selectedColor, int tempSlotIndex)
         {
-            stopCurrentAutoResolveChain = false;
+            resolvedTempSlotsThisChain.Clear();
             TryResolveSelectedColorFirst(selectedColor, tempSlotIndex);
-
-            if (stopCurrentAutoResolveChain)
-            {
-                stopCurrentAutoResolveChain = false;
-                return;
-            }
 
             int iterationLimit = Mathf.Max(1, autoResolveSafetyLimit);
             for (int iteration = 0; iteration < iterationLimit; iteration++)
@@ -210,15 +204,7 @@ namespace EliminateGame.Core
                 {
                     break;
                 }
-
-                if (stopCurrentAutoResolveChain)
-                {
-                    stopCurrentAutoResolveChain = false;
-                    break;
-                }
             }
-
-            stopCurrentAutoResolveChain = false;
         }
 
         private bool TryResolveSelectedColorFirst(BlockColor selectedColor, int tempSlotIndex)
@@ -231,6 +217,13 @@ namespace EliminateGame.Core
 
             if (effectiveSlotIndex < 0)
             {
+                return false;
+            }
+
+            TempZoneSlot slot = tempZoneController.Slots[effectiveSlotIndex];
+            if (resolvedTempSlotsThisChain.Contains(slot))
+            {
+                Debug.Log($"[RESOLVE_DEBUG] TryResolveSelectedColorFirst skipResolvedSlot slotIndex={effectiveSlotIndex} color={selectedColor} progress={slot.ProgressMark}");
                 return false;
             }
 
@@ -255,8 +248,14 @@ namespace EliminateGame.Core
 
             for (int i = 0; i < slots.Count; i++)
             {
+                TempZoneSlot slot = slots[i];
+                if (resolvedTempSlotsThisChain.Contains(slot))
+                {
+                    Debug.Log($"[RESOLVE_DEBUG] TryResolveAnyTempSlotForCurrentBottomRow skipResolvedSlot slotIndex={i} color={slot.Color} progress={slot.ProgressMark}");
+                    continue;
+                }
 
-                BlockColor slotColor = slots[i].Color;
+                BlockColor slotColor = slot.Color;
                 if (!candidateColors.Contains(slotColor))
                 {
                     continue;
@@ -266,6 +265,16 @@ namespace EliminateGame.Core
             }
 
             return false;
+        }
+
+        private void MarkTempSlotResolvedThisChain(int slotIndex)
+        {
+            if (slotIndex < 0 || slotIndex >= tempZoneController.Slots.Count)
+            {
+                return;
+            }
+
+            resolvedTempSlotsThisChain.Add(tempZoneController.Slots[slotIndex]);
         }
 
         private bool IsValidSlotIndexWithColor(int slotIndex, BlockColor color)
@@ -385,14 +394,15 @@ namespace EliminateGame.Core
                 return false;
             }
 
+            MarkTempSlotResolvedThisChain(tempSlotIndex);
+
             if (result.IsCaseA)
             {
                 tempZoneController.ApplyCaseAProgress(tempSlotIndex, result.PatternRemovedCount);
 
                 if (isForcedCaseAFallback)
                 {
-                    stopCurrentAutoResolveChain = true;
-                    Debug.Log("[COUNT_TRACE] stopCurrentAutoResolveChain=True after ForcedCaseAFallback");
+                    Debug.Log("[COUNT_TRACE] ForcedCaseAFallback resolved without stopping auto resolve chain.");
                 }
                 Dictionary<BlockColor, int> afterCaseACounts = BuildPatternAndTempZoneColorCounts();
                 AssertColorConsistencyAfterResolve(beforeCounts, afterCaseACounts, selectedColor, result.PatternRemovedCount, "ResolveAgainstTempSlot.AfterCaseA");
