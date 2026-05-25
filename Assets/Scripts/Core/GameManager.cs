@@ -29,7 +29,6 @@ namespace EliminateGame.Core
 
         private System.Random rescueRandom;
         private int rescueUses;
-        private BlockColor suppressAutoResolveColor = BlockColor.None;
         private GUIStyle stateLabelStyle;
         private GUIStyle restartButtonStyle;
         private bool isMenuOpen;
@@ -185,7 +184,6 @@ namespace EliminateGame.Core
 
         private void ResolvePatternUsingTempZoneChain(BlockColor selectedColor, int tempSlotIndex)
         {
-            suppressAutoResolveColor = BlockColor.None;
             TryResolveSelectedColorFirst(selectedColor, tempSlotIndex);
 
             int iterationLimit = Mathf.Max(1, autoResolveSafetyLimit);
@@ -202,12 +200,9 @@ namespace EliminateGame.Core
 
                 if (!TryResolveAnyTempSlotForCurrentBottomRow())
                 {
-                    suppressAutoResolveColor = BlockColor.None;
                     break;
                 }
             }
-
-            suppressAutoResolveColor = BlockColor.None;
         }
 
         private bool TryResolveSelectedColorFirst(BlockColor selectedColor, int tempSlotIndex)
@@ -234,18 +229,7 @@ namespace EliminateGame.Core
                 return false;
             }
 
-            HashSet<BlockColor> candidateColors = new HashSet<BlockColor>(bottomRowColors);
-            if (suppressAutoResolveColor != BlockColor.None)
-            {
-                candidateColors.Remove(suppressAutoResolveColor);
-            }
-
-            if (candidateColors.Count == 0)
-            {
-                return false;
-            }
-
-            if (!tempZoneController.TryFindMatchingSlot(candidateColors, out int slotIndex, out BlockColor color))
+            if (!tempZoneController.TryFindMatchingSlot(new HashSet<BlockColor>(bottomRowColors), out int slotIndex, out BlockColor color))
             {
                 return false;
             }
@@ -372,12 +356,6 @@ namespace EliminateGame.Core
 
             if (result.IsCaseA)
             {
-                if (isForcedCaseAFallback)
-                {
-                    suppressAutoResolveColor = selectedColor;
-                    Debug.Log($"[COUNT_TRACE] SuppressAutoResolveColor set to {selectedColor} after ForcedCaseAFallback");
-                }
-
                 tempZoneController.ApplyCaseAProgress(tempSlotIndex, result.PatternRemovedCount);
                 Dictionary<BlockColor, int> afterCaseACounts = BuildPatternAndTempZoneColorCounts();
                 AssertColorConsistencyAfterResolve(beforeCounts, afterCaseACounts, selectedColor, result.PatternRemovedCount, "ResolveAgainstTempSlot.AfterCaseA");
