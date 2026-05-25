@@ -160,27 +160,26 @@ namespace EliminateGame.Pattern
             int nonNoneBeforeResolve = GetNonNoneCellCount();
             SCG.List<PatternCell> bottomRow = patternRows[bottomIndex];
             string bottomBefore = string.Join(",", bottomRow.Select(cell => cell.Color));
-            int firstMatchingIndex = -1;
+            SCG.List<int> matchingIndices = new SCG.List<int>();
+
             for (int i = 0; i < bottomRow.Count; i++)
             {
                 if (bottomRow[i].Color == color)
                 {
-                    firstMatchingIndex = i;
-                    break;
+                    matchingIndices.Add(i);
                 }
             }
 
-            Debug.Log($"[RESOLVE_DEBUG] Pattern.ResolveAgainstBottomRowForcedCaseA inputColor={color} bottomRowIndex={bottomIndex} bottomRowBefore=[{bottomBefore}] firstMatchingIndex={firstMatchingIndex}");
+            Debug.Log($"[RESOLVE_DEBUG] Pattern.ResolveAgainstBottomRowForcedCaseA inputColor={color} bottomRowIndex={bottomIndex} bottomRowBefore=[{bottomBefore}] matchingCount={matchingIndices.Count}");
 
-            if (firstMatchingIndex < 0)
+            if (matchingIndices.Count == 0)
             {
                 comboCount = 0;
                 return PatternResolveResult.NoMatch();
             }
 
-            SCG.List<int> removedIndices = new SCG.List<int> { firstMatchingIndex };
-            SCG.List<RemovedCellInfo> removedCells = CaptureRemovedCells(bottomIndex, bottomRow, removedIndices);
-            SetCellsToNone(bottomRow, removedIndices);
+            SCG.List<RemovedCellInfo> removedCells = CaptureRemovedCells(bottomIndex, bottomRow, matchingIndices);
+            SetCellsToNone(bottomRow, matchingIndices);
             comboCount++;
             CameraShake.Instance?.ShakeWithCombo(comboCount);
             SfxController.Instance?.PlayPatternHit(comboCount);
@@ -193,9 +192,9 @@ namespace EliminateGame.Pattern
                 ? string.Join(",", patternRows[postBottomIndex].Select(cell => cell.Color))
                 : "<empty>";
             Debug.Log($"[RESOLVE_DEBUG] Pattern.ResolveAgainstBottomRowForcedCaseA case=CaseA bottomRowAfterResolve=[{postBottomRow}] bottomRowAfterGravityCollapse=[{string.Join(",", GetBottomRowColors())}]");
-            Debug.Log($"Pattern Forced Case A resolved for {color}. Removed=1 from bottom row (left-to-right first match).");
-            AssertResolvedNonNoneCount(color, nonNoneBeforeResolve - 1, 1);
-            return PatternResolveResult.CaseA(1);
+            Debug.Log($"Pattern Forced Case A resolved for {color}. Removed={matchingIndices.Count} from bottom row.");
+            AssertResolvedNonNoneCount(color, nonNoneBeforeResolve - matchingIndices.Count, matchingIndices.Count);
+            return PatternResolveResult.CaseA(matchingIndices.Count);
         }
 
         public PatternResolveResult ResolveAgainstBottomRow(BlockColor color)
