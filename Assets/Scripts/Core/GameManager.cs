@@ -97,7 +97,6 @@ namespace EliminateGame.Core
             selectionAreaGridController.TileSelected += OnSelectionAreaTileSelected;
 
             Debug.Log("Game run started.");
-            Debug.Log($"[INVARIANT_TRACE] Stage=StartRun.AfterInitialize selectionRemaining={FormatSelectionRemainingCounts()} report={BuildRemainingInvariantReport()}");
             AssertGameRuntimeSafety("StartRun");
             EvaluateStateAfterAction();
         }
@@ -166,7 +165,6 @@ namespace EliminateGame.Core
 
             resolveClickSequenceId++;
             resolveStepSequenceId = 0;
-            Debug.Log($"[CHAIN_TRACE] ClickStart id={resolveClickSequenceId} clickedColor={tile.Color}");
             Debug.Log($"[RESOLVE_DEBUG] OnSelectionAreaTileSelected clickedColor={tile.Color} tempZoneCountBeforeAdd={tempZoneController.Count}");
             int tempSlotIndex = tempZoneController.AddTile(tile.Color);
             if (tempSlotIndex < 0)
@@ -179,9 +177,7 @@ namespace EliminateGame.Core
             Debug.Log($"[RESOLVE_DEBUG] OnSelectionAreaTileSelected tempZoneCountAfterAdd={tempZoneController.Count} addedSlotIndex={tempSlotIndex}");
 
             AssertGameRuntimeSafety("OnSelectionAreaTileSelected.BeforeConsume", tile.Color, tempSlotIndex);
-            Debug.Log($"[INVARIANT_TRACE] Stage=OnSelectionAreaTileSelected.BeforeConsume selectionRemaining={FormatSelectionRemainingCounts()} report={BuildRemainingInvariantReport()}");
             selectionAreaGridController.ConsumeTileAndUnlockCrossNeighbors(tile);
-            Debug.Log($"[INVARIANT_TRACE] Stage=OnSelectionAreaTileSelected.AfterConsume selectionRemaining={FormatSelectionRemainingCounts()} report={BuildRemainingInvariantReport()}");
             ResolvePatternUsingTempZoneChain(tile.Color, tempSlotIndex);
             AssertGameRuntimeSafety("OnSelectionAreaTileSelected.AfterResolve", tile.Color, tempSlotIndex, validateSlotIndex: false);
             EvaluateStateAfterAction();
@@ -209,7 +205,6 @@ namespace EliminateGame.Core
                 }
             }
 
-            Debug.Log($"[CHAIN_TRACE] ChainEnd clickId={resolveClickSequenceId}");
         }
 
         private bool TryResolveSelectedColorFirst(BlockColor selectedColor, int tempSlotIndex)
@@ -242,7 +237,6 @@ namespace EliminateGame.Core
             }
 
             string bottomRowColorLog = bottomRowColors.Count > 0 ? string.Join(",", bottomRowColors) : "<empty>";
-            Debug.Log($"[CHAIN_TRACE] AutoResolveCandidate clickId={resolveClickSequenceId} slotIndex={slotIndex} color={color} bottomRow=[{bottomRowColorLog}]");
 
             return ResolveAgainstTempSlot(color, slotIndex);
         }
@@ -333,7 +327,6 @@ namespace EliminateGame.Core
         private bool ResolveAgainstTempSlot(BlockColor selectedColor, int tempSlotIndex)
         {
             resolveStepSequenceId++;
-            Debug.Log($"[CHAIN_TRACE] ResolveStep clickId={resolveClickSequenceId} step={resolveStepSequenceId} selectedColor={selectedColor} tempSlotIndex={tempSlotIndex}");
 
             int bottomRowCount = patternController.GetBottomRowCount(selectedColor);
             int targetSlotProgress = tempZoneController.Slots[tempSlotIndex].ProgressMark;
@@ -344,22 +337,16 @@ namespace EliminateGame.Core
             string patternCountsBefore = FormatColorCounts(patternController.GetNonNoneColorCounts());
             string tempSlotsBefore = FormatTempSlots();
 
-            Debug.Log($"[COUNT_TRACE] ResolveAmount selectedColor={selectedColor} bottomRowCount={bottomRowCount} targetSlotProgress={targetSlotProgress} remainingProgress={remainingProgress} removeCount={removeCount}");
 
             Debug.Log(
-                $"[COUNT_TRACE] BeforePatternResolve selectedColor={selectedColor} tempSlotIndex={tempSlotIndex} bottomRowCount={bottomRowCount} targetSlotProgress={targetSlotProgress} remainingProgress={remainingProgress} removeCount={removeCount} patternCountsBefore={patternCountsBefore} tempSlotsBefore={tempSlotsBefore}");
             Debug.Log($"[RESOLVE_DEBUG] ResolveAgainstTempSlot beforeResolve selectedColor={selectedColor} tempSlotIndex={tempSlotIndex}");
-            Debug.Log($"[INVARIANT_TRACE] Stage=ResolveAgainstTempSlot.BeforePatternResolve selectedColor={selectedColor} selectionRemaining={FormatSelectionRemainingCounts()} report={BuildRemainingInvariantReport()}");
             AssertGameRuntimeSafety("ResolveAgainstTempSlot.BeforePatternResolve", selectedColor, tempSlotIndex);
             Dictionary<BlockColor, int> beforeCounts = BuildPatternAndTempZoneColorCounts();
             PatternResolveResult result = patternController.ResolveAgainstBottomRowWithLimit(selectedColor, removeCount);
             string patternCountsAfterPatternResolve = FormatColorCounts(patternController.GetNonNoneColorCounts());
             string tempSlotsBeforeMutation = FormatTempSlots();
             Debug.Log(
-                $"[COUNT_TRACE] AfterPatternResolve resultMatched={result.Matched} resultIsCaseA={result.IsCaseA} resultPatternRemovedCount={result.PatternRemovedCount} patternCountsAfterPatternResolve={patternCountsAfterPatternResolve} tempSlotsBeforeTempMutation={tempSlotsBeforeMutation}");
             Debug.Log($"[RESOLVE_DEBUG] ResolveAgainstTempSlot afterResolve matched={result.Matched} isCaseA={result.IsCaseA} patternRemovedCount={result.PatternRemovedCount}");
-            Debug.Log($"[CHAIN_TRACE] ResolveStepResult clickId={resolveClickSequenceId} step={resolveStepSequenceId} selectedColor={selectedColor} resultIsCaseA={result.IsCaseA} removed={result.PatternRemovedCount}");
-            Debug.Log($"[INVARIANT_TRACE] Stage=ResolveAgainstTempSlot.AfterPatternResolve selectedColor={selectedColor} selectionRemaining={FormatSelectionRemainingCounts()} report={BuildRemainingInvariantReport()}");
             if (!result.Matched)
             {
                 return false;
@@ -369,8 +356,6 @@ namespace EliminateGame.Core
             Dictionary<BlockColor, int> afterCaseACounts = BuildPatternAndTempZoneColorCounts();
             AssertColorConsistencyAfterResolve(beforeCounts, afterCaseACounts, selectedColor, result.PatternRemovedCount, "ResolveAgainstTempSlot.AfterProgressResolve");
             AssertGameRuntimeSafety("ResolveAgainstTempSlot.AfterProgressResolve", selectedColor, tempSlotIndex);
-            Debug.Log($"[COUNT_TRACE] AfterTempMutation branch=GameManager.ProgressResolve patternCountsAfterBranch={FormatColorCounts(patternController.GetNonNoneColorCounts())} tempSlotsAfterBranch={FormatTempSlots()}");
-            Debug.Log($"[INVARIANT_TRACE] Stage=ResolveAgainstTempSlot.AfterTempMutation branch=GameManager.ProgressResolve selectedColor={selectedColor} selectionRemaining={FormatSelectionRemainingCounts()} report={BuildRemainingInvariantReport()}");
             CleanupStaleTempZoneSlotsAfterPatternUpdate();
             return true;
         }
@@ -379,8 +364,6 @@ namespace EliminateGame.Core
         private void CleanupStaleTempZoneSlotsAfterPatternUpdate()
         {
             tempZoneController.RemoveSlotsWhereColorNoLongerExists(patternController.ContainsColor);
-            Debug.Log($"[COUNT_TRACE] AfterCleanup patternCountsAfterCleanup={FormatColorCounts(patternController.GetNonNoneColorCounts())} tempSlotsAfterCleanup={FormatTempSlots()}");
-            Debug.Log($"[INVARIANT_TRACE] Stage=ResolveAgainstTempSlot.AfterStaleCleanup selectionRemaining={FormatSelectionRemainingCounts()} report={BuildRemainingInvariantReport()}");
         }
 
         private string FormatColorCounts(Dictionary<BlockColor, int> counts)
@@ -514,7 +497,6 @@ namespace EliminateGame.Core
             }
 
             Debug.Log($"Game running. PatternBottom=[{string.Join(",", bottomRow)}], TempCount={tempZoneController.Count}/{tempZoneController.Capacity}, Rescue={rescueUses}/{gameConfig.MaxRescueUses}");
-            Debug.Log($"[INVARIANT_TRACE] Stage=EvaluateStateAfterAction.Running selectionRemaining={FormatSelectionRemainingCounts()} report={BuildRemainingInvariantReport()}");
         }
 
         private void OnGUI()
