@@ -33,6 +33,8 @@ namespace EliminateGame.Core
         private GUIStyle restartButtonStyle;
         private bool isMenuOpen;
         private GameConfig activeGameConfig;
+        private int resolveClickSequenceId;
+        private int resolveStepSequenceId;
 
         public GameState State { get; private set; } = GameState.None;
         public int RescueUses => rescueUses;
@@ -162,6 +164,9 @@ namespace EliminateGame.Core
                 return;
             }
 
+            resolveClickSequenceId++;
+            resolveStepSequenceId = 0;
+            Debug.Log($"[CHAIN_TRACE] ClickStart id={resolveClickSequenceId} clickedColor={tile.Color}");
             Debug.Log($"[RESOLVE_DEBUG] OnSelectionAreaTileSelected clickedColor={tile.Color} tempZoneCountBeforeAdd={tempZoneController.Count}");
             int tempSlotIndex = tempZoneController.AddTile(tile.Color);
             if (tempSlotIndex < 0)
@@ -203,6 +208,8 @@ namespace EliminateGame.Core
                     break;
                 }
             }
+
+            Debug.Log($"[CHAIN_TRACE] ChainEnd clickId={resolveClickSequenceId}");
         }
 
         private bool TryResolveSelectedColorFirst(BlockColor selectedColor, int tempSlotIndex)
@@ -233,6 +240,9 @@ namespace EliminateGame.Core
             {
                 return false;
             }
+
+            string bottomRowColorLog = bottomRowColors.Count > 0 ? string.Join(",", bottomRowColors) : "<empty>";
+            Debug.Log($"[CHAIN_TRACE] AutoResolveCandidate clickId={resolveClickSequenceId} slotIndex={slotIndex} color={color} bottomRow=[{bottomRowColorLog}]");
 
             return ResolveAgainstTempSlot(color, slotIndex);
         }
@@ -322,6 +332,9 @@ namespace EliminateGame.Core
 
         private bool ResolveAgainstTempSlot(BlockColor selectedColor, int tempSlotIndex)
         {
+            resolveStepSequenceId++;
+            Debug.Log($"[CHAIN_TRACE] ResolveStep clickId={resolveClickSequenceId} step={resolveStepSequenceId} selectedColor={selectedColor} tempSlotIndex={tempSlotIndex}");
+
             int bottomRowCount = patternController.GetBottomRowCount(selectedColor);
             int sameColorCountInTemp = tempZoneController.Slots.Count(slot => slot.Color == selectedColor);
             bool canExecuteCaseB = bottomRowCount >= 3 && sameColorCountInTemp >= 3;
@@ -348,6 +361,7 @@ namespace EliminateGame.Core
             Debug.Log(
                 $"[COUNT_TRACE] AfterPatternResolve resultMatched={result.Matched} resultIsCaseA={result.IsCaseA} resultPatternRemovedCount={result.PatternRemovedCount} patternCountsAfterPatternResolve={patternCountsAfterPatternResolve} tempSlotsBeforeTempMutation={tempSlotsBeforeMutation}");
             Debug.Log($"[RESOLVE_DEBUG] ResolveAgainstTempSlot afterResolve matched={result.Matched} isCaseA={result.IsCaseA} patternRemovedCount={result.PatternRemovedCount}");
+            Debug.Log($"[CHAIN_TRACE] ResolveStepResult clickId={resolveClickSequenceId} step={resolveStepSequenceId} selectedColor={selectedColor} resultIsCaseA={result.IsCaseA} removed={result.PatternRemovedCount}");
             Debug.Log($"[INVARIANT_TRACE] Stage=ResolveAgainstTempSlot.AfterPatternResolve selectedColor={selectedColor} selectionRemaining={FormatSelectionRemainingCounts()} report={BuildRemainingInvariantReport()}");
             if (!result.Matched)
             {
