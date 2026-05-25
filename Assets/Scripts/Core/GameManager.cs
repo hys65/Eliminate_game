@@ -336,26 +336,23 @@ namespace EliminateGame.Core
             Debug.Log($"[CHAIN_TRACE] ResolveStep clickId={resolveClickSequenceId} step={resolveStepSequenceId} selectedColor={selectedColor} tempSlotIndex={tempSlotIndex}");
 
             int bottomRowCount = patternController.GetBottomRowCount(selectedColor);
-            int sameColorCountInTemp = tempZoneController.Slots.Count(slot => slot.Color == selectedColor);
-            bool canExecuteCaseB = bottomRowCount >= 3 && sameColorCountInTemp >= 3;
+            int targetSlotProgress = tempZoneController.Slots[tempSlotIndex].ProgressMark;
+            int remainingProgress = Mathf.Clamp(3 - targetSlotProgress, 0, 3);
+            int removeCount = bottomRowCount < 3
+                ? bottomRowCount
+                : Mathf.Min(bottomRowCount, remainingProgress);
             string patternCountsBefore = FormatColorCounts(patternController.GetNonNoneColorCounts());
             string tempSlotsBefore = FormatTempSlots();
 
-            if (bottomRowCount >= 3 && !canExecuteCaseB)
-            {
-                Debug.Log($"Case B unavailable for {selectedColor}. BottomRowCount={bottomRowCount}, Temp Zone has {sameColorCountInTemp}/3 required tiles. Falling back to Case A.");
-            }
+            Debug.Log($"[COUNT_TRACE] ResolveAmount selectedColor={selectedColor} bottomRowCount={bottomRowCount} targetSlotProgress={targetSlotProgress} remainingProgress={remainingProgress} removeCount={removeCount}");
 
             Debug.Log(
-                $"[COUNT_TRACE] BeforePatternResolve selectedColor={selectedColor} tempSlotIndex={tempSlotIndex} bottomRowCount={bottomRowCount} sameColorCountInTemp={sameColorCountInTemp} canExecuteCaseB={canExecuteCaseB} patternCountsBefore={patternCountsBefore} tempSlotsBefore={tempSlotsBefore}");
+                $"[COUNT_TRACE] BeforePatternResolve selectedColor={selectedColor} tempSlotIndex={tempSlotIndex} bottomRowCount={bottomRowCount} targetSlotProgress={targetSlotProgress} remainingProgress={remainingProgress} removeCount={removeCount} patternCountsBefore={patternCountsBefore} tempSlotsBefore={tempSlotsBefore}");
             Debug.Log($"[RESOLVE_DEBUG] ResolveAgainstTempSlot beforeResolve selectedColor={selectedColor} tempSlotIndex={tempSlotIndex}");
             Debug.Log($"[INVARIANT_TRACE] Stage=ResolveAgainstTempSlot.BeforePatternResolve selectedColor={selectedColor} selectionRemaining={FormatSelectionRemainingCounts()} report={BuildRemainingInvariantReport()}");
             AssertGameRuntimeSafety("ResolveAgainstTempSlot.BeforePatternResolve", selectedColor, tempSlotIndex);
             Dictionary<BlockColor, int> beforeCounts = BuildPatternAndTempZoneColorCounts();
-            bool isForcedCaseAFallback = bottomRowCount >= 3 && !canExecuteCaseB;
-            PatternResolveResult result = isForcedCaseAFallback
-                ? patternController.ResolveAgainstBottomRowForcedCaseA(selectedColor)
-                : patternController.ResolveAgainstBottomRow(selectedColor);
+            PatternResolveResult result = patternController.ResolveAgainstBottomRowWithLimit(selectedColor, removeCount);
             string patternCountsAfterPatternResolve = FormatColorCounts(patternController.GetNonNoneColorCounts());
             string tempSlotsBeforeMutation = FormatTempSlots();
             Debug.Log(
@@ -368,38 +365,12 @@ namespace EliminateGame.Core
                 return false;
             }
 
-            if (result.IsCaseA)
-            {
-                tempZoneController.ApplyCaseAProgress(tempSlotIndex, result.PatternRemovedCount);
-                Dictionary<BlockColor, int> afterCaseACounts = BuildPatternAndTempZoneColorCounts();
-                AssertColorConsistencyAfterResolve(beforeCounts, afterCaseACounts, selectedColor, result.PatternRemovedCount, "ResolveAgainstTempSlot.AfterCaseA");
-                AssertGameRuntimeSafety("ResolveAgainstTempSlot.AfterCaseA", selectedColor, tempSlotIndex);
-                string caseABranch = isForcedCaseAFallback ? "ForcedCaseAFallback" : "GameManager.CaseAProgress";
-                Debug.Log($"[COUNT_TRACE] AfterTempMutation branch={caseABranch} patternCountsAfterBranch={FormatColorCounts(patternController.GetNonNoneColorCounts())} tempSlotsAfterBranch={FormatTempSlots()}");
-                Debug.Log($"[INVARIANT_TRACE] Stage=ResolveAgainstTempSlot.AfterTempMutation branch={caseABranch} selectedColor={selectedColor} selectionRemaining={FormatSelectionRemainingCounts()} report={BuildRemainingInvariantReport()}");
-                CleanupStaleTempZoneSlotsAfterPatternUpdate();
-                return true;
-            }
-
-            if (!canExecuteCaseB)
-            {
-                Debug.LogWarning($"Unexpected Case B resolve for {selectedColor} while unavailable. Preserving resolve chain by applying Case A progress.");
-                tempZoneController.ApplyCaseAProgress(tempSlotIndex, result.PatternRemovedCount);
-                Dictionary<BlockColor, int> afterCaseACounts = BuildPatternAndTempZoneColorCounts();
-                AssertColorConsistencyAfterResolve(beforeCounts, afterCaseACounts, selectedColor, result.PatternRemovedCount, "ResolveAgainstTempSlot.AfterCaseA");
-                AssertGameRuntimeSafety("ResolveAgainstTempSlot.AfterCaseA", selectedColor, tempSlotIndex);
-                Debug.Log($"[COUNT_TRACE] AfterTempMutation branch=GameManager.UnexpectedCaseBFallbackToCaseAProgress patternCountsAfterBranch={FormatColorCounts(patternController.GetNonNoneColorCounts())} tempSlotsAfterBranch={FormatTempSlots()}");
-                Debug.Log($"[INVARIANT_TRACE] Stage=ResolveAgainstTempSlot.AfterTempMutation branch=GameManager.UnexpectedCaseBFallbackToCaseAProgress selectedColor={selectedColor} selectionRemaining={FormatSelectionRemainingCounts()} report={BuildRemainingInvariantReport()}");
-                CleanupStaleTempZoneSlotsAfterPatternUpdate();
-                return true;
-            }
-
-            tempZoneController.RemoveByColor(selectedColor, 3);
-            Dictionary<BlockColor, int> afterCaseBCounts = BuildPatternAndTempZoneColorCounts();
-            AssertColorConsistencyAfterResolve(beforeCounts, afterCaseBCounts, selectedColor, result.PatternRemovedCount + 3, "ResolveAgainstTempSlot.AfterCaseB");
-            AssertGameRuntimeSafety("ResolveAgainstTempSlot.AfterCaseB", selectedColor, tempSlotIndex);
-            Debug.Log($"[COUNT_TRACE] AfterTempMutation branch=GameManager.CaseBRemoveThree patternCountsAfterBranch={FormatColorCounts(patternController.GetNonNoneColorCounts())} tempSlotsAfterBranch={FormatTempSlots()}");
-            Debug.Log($"[INVARIANT_TRACE] Stage=ResolveAgainstTempSlot.AfterTempMutation branch=GameManager.CaseBRemoveThree selectedColor={selectedColor} selectionRemaining={FormatSelectionRemainingCounts()} report={BuildRemainingInvariantReport()}");
+            tempZoneController.ApplyCaseAProgress(tempSlotIndex, result.PatternRemovedCount);
+            Dictionary<BlockColor, int> afterCaseACounts = BuildPatternAndTempZoneColorCounts();
+            AssertColorConsistencyAfterResolve(beforeCounts, afterCaseACounts, selectedColor, result.PatternRemovedCount, "ResolveAgainstTempSlot.AfterProgressResolve");
+            AssertGameRuntimeSafety("ResolveAgainstTempSlot.AfterProgressResolve", selectedColor, tempSlotIndex);
+            Debug.Log($"[COUNT_TRACE] AfterTempMutation branch=GameManager.ProgressResolve patternCountsAfterBranch={FormatColorCounts(patternController.GetNonNoneColorCounts())} tempSlotsAfterBranch={FormatTempSlots()}");
+            Debug.Log($"[INVARIANT_TRACE] Stage=ResolveAgainstTempSlot.AfterTempMutation branch=GameManager.ProgressResolve selectedColor={selectedColor} selectionRemaining={FormatSelectionRemainingCounts()} report={BuildRemainingInvariantReport()}");
             CleanupStaleTempZoneSlotsAfterPatternUpdate();
             return true;
         }
