@@ -33,6 +33,7 @@ namespace EliminateGame.Core
         private GUIStyle restartButtonStyle;
         private bool isMenuOpen;
         private GameConfig activeGameConfig;
+        private readonly HashSet<BlockColor> forcedFallbackColorsThisChain = new HashSet<BlockColor>();
 
         public GameState State { get; private set; } = GameState.None;
         public int RescueUses => rescueUses;
@@ -184,6 +185,7 @@ namespace EliminateGame.Core
 
         private void ResolvePatternUsingTempZoneChain(BlockColor selectedColor, int tempSlotIndex)
         {
+            forcedFallbackColorsThisChain.Clear();
             TryResolveSelectedColorFirst(selectedColor, tempSlotIndex);
 
             int iterationLimit = Mathf.Max(1, autoResolveSafetyLimit);
@@ -203,6 +205,8 @@ namespace EliminateGame.Core
                     break;
                 }
             }
+
+            forcedFallbackColorsThisChain.Clear();
         }
 
         private bool TryResolveSelectedColorFirst(BlockColor selectedColor, int tempSlotIndex)
@@ -325,6 +329,9 @@ namespace EliminateGame.Core
             int bottomRowCount = patternController.GetBottomRowCount(selectedColor);
             int sameColorCountInTemp = tempZoneController.Slots.Count(slot => slot.Color == selectedColor);
             bool canExecuteCaseB = bottomRowCount >= 3 && sameColorCountInTemp >= 3;
+            bool isForcedCaseAFallback =
+                bottomRowCount >= 3 &&
+                sameColorCountInTemp < 3;
             string patternCountsBefore = FormatColorCounts(patternController.GetNonNoneColorCounts());
             string tempSlotsBefore = FormatTempSlots();
 
@@ -333,13 +340,22 @@ namespace EliminateGame.Core
                 Debug.Log($"Case B unavailable for {selectedColor}. BottomRowCount={bottomRowCount}, Temp Zone has {sameColorCountInTemp}/3 required tiles. Falling back to Case A.");
             }
 
+            if (isForcedCaseAFallback && forcedFallbackColorsThisChain.Contains(selectedColor))
+            {
+                Debug.Log($"[COUNT_TRACE] ForcedCaseAFallback skipped because color already fallbacked this chain: Color={selectedColor}");
+                return false;
+            }
+
             Debug.Log(
                 $"[COUNT_TRACE] BeforePatternResolve selectedColor={selectedColor} tempSlotIndex={tempSlotIndex} bottomRowCount={bottomRowCount} sameColorCountInTemp={sameColorCountInTemp} canExecuteCaseB={canExecuteCaseB} patternCountsBefore={patternCountsBefore} tempSlotsBefore={tempSlotsBefore}");
             Debug.Log($"[RESOLVE_DEBUG] ResolveAgainstTempSlot beforeResolve selectedColor={selectedColor} tempSlotIndex={tempSlotIndex}");
             Debug.Log($"[INVARIANT_TRACE] Stage=ResolveAgainstTempSlot.BeforePatternResolve selectedColor={selectedColor} selectionRemaining={FormatSelectionRemainingCounts()} report={BuildRemainingInvariantReport()}");
             AssertGameRuntimeSafety("ResolveAgainstTempSlot.BeforePatternResolve", selectedColor, tempSlotIndex);
             Dictionary<BlockColor, int> beforeCounts = BuildPatternAndTempZoneColorCounts();
-            bool isForcedCaseAFallback = bottomRowCount >= 3 && !canExecuteCaseB;
+            if (isForcedCaseAFallback)
+            {
+                forcedFallbackColorsThisChain.Add(selectedColor);
+            }
             PatternResolveResult result = isForcedCaseAFallback
                 ? patternController.ResolveAgainstBottomRowForcedCaseA(selectedColor)
                 : patternController.ResolveAgainstBottomRow(selectedColor);
