@@ -338,14 +338,12 @@ namespace EliminateGame.Core
             string tempSlotsBefore = FormatTempSlots();
 
 
-            Debug.Log(
             Debug.Log($"[RESOLVE_DEBUG] ResolveAgainstTempSlot beforeResolve selectedColor={selectedColor} tempSlotIndex={tempSlotIndex}");
             AssertGameRuntimeSafety("ResolveAgainstTempSlot.BeforePatternResolve", selectedColor, tempSlotIndex);
             Dictionary<BlockColor, int> beforeCounts = BuildPatternAndTempZoneColorCounts();
             PatternResolveResult result = patternController.ResolveAgainstBottomRowWithLimit(selectedColor, removeCount);
             string patternCountsAfterPatternResolve = FormatColorCounts(patternController.GetNonNoneColorCounts());
             string tempSlotsBeforeMutation = FormatTempSlots();
-            Debug.Log(
             Debug.Log($"[RESOLVE_DEBUG] ResolveAgainstTempSlot afterResolve matched={result.Matched} isCaseA={result.IsCaseA} patternRemovedCount={result.PatternRemovedCount}");
             if (!result.Matched)
             {
