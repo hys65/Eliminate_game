@@ -354,10 +354,19 @@ namespace EliminateGame.Core
             }
 
             tempZoneController.ApplyCaseAProgress(tempSlotIndex, result.PatternRemovedCount);
+
+            bool slotStillExists = IsValidSlotIndexWithColor(tempSlotIndex, selectedColor);
+            int safetySlotIndex = slotStillExists ? tempSlotIndex : -1;
+            bool validateSlotIndex = slotStillExists;
+            if (!slotStillExists)
+            {
+                Debug.Log($"[RESOLVE_DEBUG] Temp slot removed during ApplyCaseAProgress oldSlotIndex={tempSlotIndex}");
+            }
+
             ValidateRuntimeInvariant("ResolveAgainstTempSlot.AfterTempZoneProgressUpdate");
             Dictionary<BlockColor, int> afterCaseACounts = BuildPatternAndTempZoneColorCounts();
             AssertColorConsistencyAfterResolve(beforeCounts, afterCaseACounts, selectedColor, result.PatternRemovedCount, "ResolveAgainstTempSlot.AfterProgressResolve");
-            AssertGameRuntimeSafety("ResolveAgainstTempSlot.AfterProgressResolve", selectedColor, tempSlotIndex);
+            AssertGameRuntimeSafety("ResolveAgainstTempSlot.AfterProgressResolve", selectedColor, safetySlotIndex, validateSlotIndex);
             CleanupStaleTempZoneSlotsAfterPatternUpdate();
             return true;
         }
