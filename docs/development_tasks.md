@@ -1,100 +1,129 @@
-- # DEVELOPMENT TASKS
+# DEVELOPMENT TASKS
 
-  # A. SelectionArea（完成）
+# A. SelectionArea（完成）
 
-  - [x] tile generation
-  - [x] click detection
-  - [x] first-row unlock
-  - [x] orthogonal unlock
+- [x] tile generation
+- [x] click detection
+- [x] first-row unlock
+- [x] orthogonal unlock
+- [x] SelectionArea only input source
 
-  ---
+---
 
-  # B. TempZone（完成）
+# B. TempZone（完成）
 
-  - [x] tile receive
-  - [x] storage semantics
-  - [x] 0/3 progress
-  - [x] 1/3 progress
-  - [x] 2/3 progress
-  - [x] TMP integration
+- [x] tile receive
+- [x] storage semantics
+- [x] 0/3 progress
+- [x] 1/3 progress
+- [x] 2/3 progress
+- [x] TMP integration
+- [x] progress += removedCount
+- [x] slot removal at 3/3
 
-  ---
+---
 
-  # C. Pattern（完成）
+# C. Pattern（完成）
 
-  - [x] visualization
-  - [x] bottom-row resolve
-  - [x] ghost feedback
-  - [x] column gravity
-  - [x] collapse
-  - [x] camera shake
+- [x] visualization
+- [x] bottom-row resolve source
+- [x] ghost feedback
+- [x] column gravity
+- [x] collapse
+- [x] camera shake
+- [x] no cross-column movement
 
-  ---
+---
 
-  # D. Resolve System（完成）
+# D. Resolve System（完成）
 
-  - [x] Case A
-  - [x] Case B
-  - [x] Case B fallback
-  - [x] auto resolve chain
-  - [x] same-color resolve
-  - [x] stale TempZone cleanup
+- [x] progress-driven resolve semantics
+- [x] removeCount formula documented and validated
+- [x] same-color resolve
+- [x] auto resolve chain（same progress-driven rule）
+- [x] stale TempZone cleanup
+- [x] invariant-aligned runtime behavior
 
-  ---
+公式（稳定版）：
 
-  # E. Runtime Stability（完成）
+removeCount =
+  if bottomRowCount < 3:
+    bottomRowCount
+  else:
+    min(bottomRowCount, 3 - currentTempSlotProgress)
 
-  - [x] index safety fixes
-  - [x] runtime assertions
-  - [x] count consistency
-  - [x] sequence validator
-  - [x] sequence solvability
-  - [x] deterministic solvability validation
-  - [x] runtime deadlock fixes
+执行：
+- Pattern remove removeCount
+- TempZone progress += removeCount
+- progress == 3 时移除 slot
 
-  ---
+---
 
-  # F. Win/Lose（完成）
+# E. Runtime Stability（完成）
 
-  - [x] WIN
-  - [x] LOSE
-  - [x] input lock
-  - [x] WIN/LOSE text
-  - [x] TempZone cleanup after WIN
+- [x] index safety fixes
+- [x] runtime assertions
+- [x] count consistency
+- [x] sequence validator
+- [x] sequence solvability
+- [x] deterministic solvability validation
+- [x] runtime deadlock fixes
+- [x] invariant tracking:
 
-  ---
+  PatternRemaining[color]
+  =
+  SelectionRemaining[color] * 3
+  +
+  TempDebt[color]
 
-  # 当前阶段
+  TempDebt[color]
+  =
+  sum(3 - TempZoneSlot.ProgressMark for same color)
 
-  System Stabilization
+---
 
-  当前重点：
-  - regression prevention
-  - runtime validation
-  - solvability validation
+# F. Win/Lose（完成）
 
-  ---
+- [x] WIN
+- [x] LOSE
+- [x] input lock
+- [x] WIN/LOSE text
+- [x] TempZone cleanup after WIN
 
-  # 下一阶段（未开始）
+---
 
-  ## Level Pipeline
+# 当前阶段
 
-  - [ ] procedural generation
-  - [ ] auto-generated layouts
-  - [ ] deterministic level generation
+System Stabilization
 
-  ---
+当前重点：
+- regression prevention
+- runtime validation
+- solvability validation
+- progress-driven semantics lock
 
-  ## Content
+---
 
-  - [ ] additional patterns
-  - [ ] difficulty curves
-  - [ ] multi-level progression
+# 下一阶段（未开始）
 
-  ---
+## Level Pipeline
 
-  ## Presentation
+- [ ] procedural generation
+- [ ] auto-generated layouts
+- [ ] deterministic level generation
 
-  - [ ] better VFX
-  - [ ] transitions
-  - [ ] production UI
+---
+
+## Content
+
+- [ ] additional patterns
+- [ ] difficulty curves
+- [ ] multi-level progression
+
+---
+
+## Presentation
+
+- [ ] better VFX
+- [ ] transitions
+- [ ] production UI
