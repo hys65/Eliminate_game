@@ -1,123 +1,155 @@
-- # PROJECT_STATE
+# PROJECT_STATE
 
-  # 当前项目状态
+# 当前项目状态
 
-  当前版本：
-  稳定可玩原型。
+当前版本：
+稳定可玩原型。
 
-  核心 runtime 系统已跑通。
+核心 runtime 系统已跑通。
 
-  ---
+---
 
-  # 当前已验证
+# 当前已验证
 
-  ## Gameplay
+## Gameplay
 
-  - SelectionArea input
-  - orthogonal unlock
-  - TempZone storage
-  - Pattern resolve
-  - auto resolve chain
-  - gravity
-  - collapse
+- SelectionArea input
+- SelectionArea is the only input source
+- orthogonal unlock
+- TempZone storage
+- Pattern resolve
+- auto resolve chain
+- gravity
+- collapse
+- no cross-column movement
 
-  ---
+---
 
-  ## Resolve Semantics
+## Resolve Semantics（Final Stabilized）
 
-  - Case A
-  - Case B
-  - Case B fallback
-  - same-color matching
-  - TempZone stale cleanup
+- progress-driven resolve（按 TempZone slot 剩余容量决定 removeCount）
+- TempZone progress += removedCount
+- slot progress 到 3/3 后移除
+- auto resolve chain 持续使用同一 progress-driven 规则
+- same-color matching
+- TempZone stale cleanup
 
-  ---
+公式：
 
-  ## Runtime Stability
+removeCount =
+  if bottomRowCount < 3:
+    bottomRowCount
+  else:
+    min(bottomRowCount, 3 - currentTempSlotProgress)
 
-  - 无已知 resolve deadlock
-  - 无已知 index crash
-  - runtime assertions 生效
-  - count consistency 已验证
-  - deterministic solvability validation 已接入 GameManager.StartRun()
+---
 
-  ---
+## Runtime Stability
 
-  ## Deterministic Solvability Validation（已接入）
+- 无已知 resolve deadlock
+- 无已知 index crash
+- runtime assertions 生效
+- count consistency 已验证
+- deterministic solvability validation 已接入 GameManager.StartRun()
 
-  在 GameManager.StartRun() 执行 deterministic solvability validation。
+---
 
-  当前 validation checks：
-  - PatternCount[color] == SelectionCount[color] * 3
-  - SelectionArea orthogonal reachability
-  - playable sequence solvability
-  - endgame color availability
-  - unavoidable deadlock
+## Deterministic Solvability Validation（已接入）
 
-  约束说明：
-  - validator is read-only
-  - validator uses copied simulation data
-  - no gameplay semantics changed
-  - no hidden auto-fixes
-  - runtime behavior remains source of truth
+在 GameManager.StartRun() 执行 deterministic solvability validation。
 
-  ---
+当前 validation checks：
+- PatternCount[color] == SelectionCount[color] * 3
+- SelectionArea orthogonal reachability
+- playable sequence solvability
+- endgame color availability
+- unavoidable deadlock
 
-  ## End States
+约束说明：
+- validator is read-only
+- validator uses copied simulation data
+- no gameplay semantics changed
+- no hidden auto-fixes
+- runtime behavior remains source of truth
 
-  - WIN
-  - LOSE
-  - input lock
-  - WIN cleanup
+---
 
-  ---
+## Runtime Invariant（核心）
 
-  # 当前可通关规则
+PatternRemaining[color]
+=
+SelectionRemaining[color] * 3
++
+TempDebt[color]
 
-  ## 总数量
+TempDebt[color]
+=
+sum(3 - TempZoneSlot.ProgressMark for same color)
 
-  PatternCount[color]
-  =
-  SelectionAreaCount[color] * 3
+说明：
+- invariant 在每次 resolve 与 auto resolve chain 中持续成立。
 
-  ---
+---
 
-  ## 顺序可通关
+## End States
 
-  已验证：
-  - unlock order
-  - reachable colors
-  - bottom-row progression
-  - endgame color availability
+- WIN
+- LOSE
+- input lock
+- WIN cleanup
 
-  ---
+---
 
-  # 当前已知限制
+# 当前可通关规则
 
-  尚未 production-ready：
+## 总数量
 
-  - polished UI
-  - advanced VFX
-  - level generator
-  - meta progression
-  - difficulty balancing
+PatternCount[color]
+=
+SelectionAreaCount[color] * 3
 
-  ---
+---
 
-  # 当前开发优先级
+## 顺序可通关
 
-  1. runtime correctness
-  2. stability
-  3. solvability
-  4. tooling
-  5. content
-  6. presentation
+已验证：
+- unlock order
+- reachable colors
+- bottom-row progression
+- endgame color availability
 
-  ---
+---
 
-  # 重要规则
+# 当前已知限制
 
-  禁止：
-  - 未确认情况下修改 gameplay semantics
-  - 擅自改变 Case A / B
-  - 私自修改 resolve chain
+尚未 production-ready：
+
+- polished UI
+- advanced VFX
+- level generator
+- meta progression
+- difficulty balancing
+
+说明：
+- procedural generation 未完成。
+- next-level flow 未声明完成。
+
+---
+
+# 当前开发优先级
+
+1. runtime correctness
+2. stability
+3. solvability
+4. tooling
+5. content
+6. presentation
+
+---
+
+# 重要规则
+
+禁止：
+- 未确认情况下修改 gameplay semantics
+- 私自偏离 progress-driven resolve 语义
+- 私自修改 resolve chain

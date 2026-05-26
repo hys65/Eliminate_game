@@ -1,176 +1,196 @@
-- # ARCHITECTURE
+# ARCHITECTURE
 
-  # 总体结构
+# 总体结构
 
-  GameManager
-   ├── SelectionAreaController
-   ├── TempZoneController
-   └── PatternController
+GameManager
+ ├── SelectionAreaController
+ ├── TempZoneController
+ └── PatternController
 
-  ---
+---
 
-  # 三层结构
+# 三层结构
 
-  Top:
-  - Pattern
+Top:
+- Pattern
 
-  Middle:
-  - TempZone
+Middle:
+- TempZone
 
-  Bottom:
-  - SelectionArea
+Bottom:
+- SelectionArea
 
-  ---
+---
 
-  # Runtime Flow（稳定版）
+# Runtime Flow（稳定版）
 
-  Selection click
-  → TempZone add
-  → Pattern resolve
-  → gravity
-  → collapse
-  → auto resolve chain
-  → win/lose check
+Selection click
+→ TempZone add
+→ Pattern resolve（progress-driven）
+→ gravity
+→ collapse
+→ auto resolve chain（same progress-driven rule）
+→ win/lose check
 
-  ---
+---
 
-  # 模块职责
+# 模块职责
 
-  ## SelectionArea
+## SelectionArea
 
-  职责：
-  - 玩家输入
-  - 解锁逻辑
-  - tile 提供
+职责：
+- 玩家输入
+- 解锁逻辑
+- tile 提供
 
-  规则：
-  - 仅输入层
-  - 不直接操作 Pattern
+规则：
+- 仅输入层
+- 不直接操作 Pattern
+- orthogonal unlock only
 
-  ---
+---
 
-  ## TempZone
+## TempZone
 
-  职责：
-  - 解析暂存
-  - progress tracking
-  - Case A / B 数据管理
+职责：
+- 解析暂存
+- progress tracking
+- slot 生命周期管理
 
-  规则：
-  - 非输入层
-  - 不负责 Pattern gravity
-  - 不负责点击
+规则：
+- 非输入层
+- 不负责 Pattern gravity
+- 不负责点击
+- slot progress 到 3/3 后移除
 
-  ---
+---
 
-  ## Pattern
+## Pattern
 
-  职责：
-  - logical grid
-  - visual grid
-  - bottom-row query
-  - resolve
-  - gravity
-  - collapse
+职责：
+- logical grid
+- visual grid
+- bottom-row query
+- resolve
+- gravity
+- collapse
 
-  规则：
-  - column gravity only
-  - no cross-column movement
-  - logical state 是 runtime source of truth
+规则：
+- column gravity only
+- no cross-column movement
+- logical state 是 runtime source of truth
 
-  ---
+---
 
-  ## GameManager
+## GameManager
 
-  职责：
-  - 唯一调度入口
-  - 串联：
-    Selection
-    → TempZone
-    → Pattern
-  - 管理 resolve chain
-  - 管理 win/lose
+职责：
+- 唯一调度入口
+- 串联：
+  Selection
+  → TempZone
+  → Pattern
+- 管理 resolve chain
+- 管理 win/lose
 
-  ---
+---
 
-  # Resolve Semantics
+# Resolve Semantics（Progress-Driven）
 
-  ## Case A
+核心：
+Resolve amount 由 TempZone 同色 slot 的剩余容量决定。
 
-  条件：
-  - 底行同色数量 < 3
-  或
-  - Case B 条件不足
+定义：
+- currentTempSlotProgress：当前同色 slot progress（0/1/2）
+- bottomRowCount：底行同色可匹配数量
 
-  行为：
-  - 消除 Pattern 单元
-  - 增加 TempZone progress
+公式：
 
-  ---
+removeCount =
+  if bottomRowCount < 3:
+    bottomRowCount
+  else:
+    min(bottomRowCount, 3 - currentTempSlotProgress)
 
-  ## Case B
+执行规则：
+- Pattern 移除 removeCount。
+- TempZone slot progress += removeCount。
+- progress 达到 3/3 时，slot 完成并移除。
 
-  条件：
-  - 底行同色数量 >= 3
-  并且
-  - TempZone 同色数量 >= 3
+说明：
+- 不再使用旧 Case A / Case B 作为主语义分支。
+- auto resolve chain 每一步都重复同一 progress-driven 规则。
 
-  行为：
-  - 消除 3 个 Pattern 单元
-  - 消除 3 个 TempZone 单元
+---
 
-  ---
+# Runtime Invariant
 
-  # Fallback Rule（关键）
+对任意颜色：
 
-  Case B 条件不足：
-  必须 fallback 到 Case A。
+PatternRemaining[color]
+=
+SelectionRemaining[color] * 3
++
+TempDebt[color]
 
-  禁止：
-  - resolve chain deadlock
-  - 卡死
+其中：
 
-  ---
+TempDebt[color]
+=
+sum(3 - TempZoneSlot.ProgressMark for same color)
 
-  # Auto Resolve Chain
+该不变量在单步 resolve 与 auto resolve chain 过程中都必须保持。
 
-  Resolve 后必须：
+---
 
-  - 获取新底行
-  - 查找 TempZone 可匹配颜色
-  - 自动继续 resolve
-  - 直到不存在匹配
+# Auto Resolve Chain
 
-  ---
+Resolve 后必须：
 
-  # Runtime Safety
+- 获取新底行
+- 查找 TempZone 可匹配颜色
+- 自动继续 resolve
+- 使用同一 progress-driven 规则
+- 直到不存在匹配
 
-  允许：
-  - Debug.Assert
-  - Runtime validation
-  - Deterministic logs
+---
 
-  禁止：
-  - Hidden auto-fix
-  - Silent gameplay mutation
-  - Runtime rule rewriting
+# Runtime Safety
 
-  ---
+允许：
+- Debug.Assert
+- Runtime validation
+- Deterministic logs
 
-  # 可通关规则
+禁止：
+- Hidden auto-fix
+- Silent gameplay mutation
+- Runtime rule rewriting
 
-  ## 总数量规则
+---
 
-  PatternCount[color]
-  =
-  SelectionAreaCount[color] * 3
+# 可通关规则
 
-  ---
+## 总数量规则
 
-  ## 顺序可通关
+PatternCount[color]
+=
+SelectionAreaCount[color] * 3
 
-  SelectionArea 解锁顺序
-  必须支持：
-  - Pattern 推进
-  - 底行变化
-  - 后期颜色可达
+---
+
+## 顺序可通关
+
+SelectionArea 解锁顺序
+必须支持：
+- Pattern 推进
+- 底行变化
+- 后期颜色可达
+
+---
+
+# 现有能力边界（文档对齐）
+
+- deterministic solvability validator：已接入
+- LevelDatabase：若当前项目已接入，则保持支持语义
+- restart/menu：若当前项目已接入，则保持支持语义
