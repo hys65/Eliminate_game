@@ -98,6 +98,7 @@ namespace EliminateGame.Core
 
             Debug.Log("Game run started.");
             AssertGameRuntimeSafety("StartRun");
+            ValidateRuntimeInvariant("StartRun.End");
             EvaluateStateAfterAction();
         }
 
@@ -178,6 +179,7 @@ namespace EliminateGame.Core
 
             AssertGameRuntimeSafety("OnSelectionAreaTileSelected.BeforeConsume", tile.Color, tempSlotIndex);
             selectionAreaGridController.ConsumeTileAndUnlockCrossNeighbors(tile);
+            ValidateRuntimeInvariant("OnSelectionAreaTileSelected.AfterConsumeTileAndUnlockCrossNeighbors");
             ResolvePatternUsingTempZoneChain(tile.Color, tempSlotIndex);
             AssertGameRuntimeSafety("OnSelectionAreaTileSelected.AfterResolve", tile.Color, tempSlotIndex, validateSlotIndex: false);
             EvaluateStateAfterAction();
@@ -342,6 +344,7 @@ namespace EliminateGame.Core
             AssertGameRuntimeSafety("ResolveAgainstTempSlot.BeforePatternResolve", selectedColor, tempSlotIndex);
             Dictionary<BlockColor, int> beforeCounts = BuildPatternAndTempZoneColorCounts();
             PatternResolveResult result = patternController.ResolveAgainstBottomRowWithLimit(selectedColor, removeCount);
+            ValidateRuntimeInvariant("ResolveAgainstTempSlot.AfterPatternResolve");
             string patternCountsAfterPatternResolve = FormatColorCounts(patternController.GetNonNoneColorCounts());
             string tempSlotsBeforeMutation = FormatTempSlots();
             Debug.Log($"[RESOLVE_DEBUG] ResolveAgainstTempSlot afterResolve matched={result.Matched} isCaseA={result.IsCaseA} patternRemovedCount={result.PatternRemovedCount}");
@@ -351,6 +354,7 @@ namespace EliminateGame.Core
             }
 
             tempZoneController.ApplyCaseAProgress(tempSlotIndex, result.PatternRemovedCount);
+            ValidateRuntimeInvariant("ResolveAgainstTempSlot.AfterTempZoneProgressUpdate");
             Dictionary<BlockColor, int> afterCaseACounts = BuildPatternAndTempZoneColorCounts();
             AssertColorConsistencyAfterResolve(beforeCounts, afterCaseACounts, selectedColor, result.PatternRemovedCount, "ResolveAgainstTempSlot.AfterProgressResolve");
             AssertGameRuntimeSafety("ResolveAgainstTempSlot.AfterProgressResolve", selectedColor, tempSlotIndex);
@@ -362,6 +366,23 @@ namespace EliminateGame.Core
         private void CleanupStaleTempZoneSlotsAfterPatternUpdate()
         {
             tempZoneController.RemoveSlotsWhereColorNoLongerExists(patternController.ContainsColor);
+            ValidateRuntimeInvariant("CleanupStaleTempZoneSlotsAfterPatternUpdate.AfterCleanup");
+        }
+
+        private bool ValidateRuntimeInvariant(string context)
+        {
+            bool isValid = RuntimeInvariantValidator.Validate(
+                patternController.GetNonNoneColorCounts(),
+                selectionAreaGridController.GetRemainingNonRemovedColorCounts(),
+                tempZoneController.Slots,
+                context);
+
+            if (!isValid)
+            {
+                Debug.LogError("Runtime invariant validation failed.");
+            }
+
+            return isValid;
         }
 
         private string FormatColorCounts(Dictionary<BlockColor, int> counts)
@@ -480,6 +501,7 @@ namespace EliminateGame.Core
                 State = GameState.Won;
                 tempZoneController.Clear();
                 Debug.Log("Victory: Entire Pattern is cleared.");
+                ValidateRuntimeInvariant("EvaluateStateAfterAction.End");
                 return;
             }
 
@@ -491,10 +513,12 @@ namespace EliminateGame.Core
             {
                 State = GameState.Failed;
                 Debug.Log("Fail: Temp Zone is full and no Temp Zone color matches current Pattern bottom row.");
+                ValidateRuntimeInvariant("EvaluateStateAfterAction.End");
                 return;
             }
 
             Debug.Log($"Game running. PatternBottom=[{string.Join(",", bottomRow)}], TempCount={tempZoneController.Count}/{tempZoneController.Capacity}, Rescue={rescueUses}/{gameConfig.MaxRescueUses}");
+            ValidateRuntimeInvariant("EvaluateStateAfterAction.End");
         }
 
         private void OnGUI()
