@@ -92,15 +92,47 @@ removeCount =
 
 ---
 
+# G. Level Authoring Documentation（完成）
+
+- [x] Level Authoring Guide completed at `docs/level_authoring_guide.md`
+- [x] current stable level authoring rules documented
+- [x] GameConfig data-only authoring workflow documented
+- [x] Editor Validation workflow documented
+- [x] committed level content must pass Editor Validation before commit
+
+Level production must follow:
+
+```text
+docs/level_authoring_guide.md
+```
+
+Before committing any new level or edited level, run Editor Validation from the Unity menu:
+
+```text
+Tools / Eliminate Game / Validate Current Config
+```
+
+The Unity Console must show:
+
+```text
+[EDITOR_VALIDATION] PASS
+```
+
+New level commits are not allowed unless Editor Validation passes.
+
+---
+
 # 当前阶段
 
-System Stabilization
+System Stabilization and Level Authoring Documentation
 
 当前重点：
 - regression prevention
 - runtime validation
 - solvability validation
 - progress-driven semantics lock
+- level production must follow `docs/level_authoring_guide.md`
+- Editor Validation must pass before committing new levels
 
 ---
 
