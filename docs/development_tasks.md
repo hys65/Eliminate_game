@@ -46,11 +46,13 @@
 
 公式（稳定版）：
 
+```text
 removeCount =
   if bottomRowCount < 3:
     bottomRowCount
   else:
     min(bottomRowCount, 3 - currentTempSlotProgress)
+```
 
 执行：
 - Pattern remove removeCount
@@ -68,8 +70,10 @@ removeCount =
 - [x] sequence solvability
 - [x] deterministic solvability validation
 - [x] runtime deadlock fixes
+- [x] RuntimeInvariantValidator remains active during gameplay
 - [x] invariant tracking:
 
+  ```text
   PatternRemaining[color]
   =
   SelectionRemaining[color] * 3
@@ -79,6 +83,7 @@ removeCount =
   TempDebt[color]
   =
   sum(3 - TempZoneSlot.ProgressMark for same color)
+  ```
 
 ---
 
@@ -99,6 +104,7 @@ removeCount =
 - [x] GameConfig data-only authoring workflow documented
 - [x] Editor Validation workflow documented
 - [x] committed level content must pass Editor Validation before commit
+- [x] stable baseline workflow documented for duplicating known-good GameConfig assets
 
 Level production must follow:
 
@@ -120,6 +126,41 @@ The Unity Console must show:
 
 New level commits are not allowed unless Editor Validation passes.
 
+After Editor Validation passes, the level must be Play tested to WIN.
+
+The verified Play Mode run must have:
+
+```text
+Console red errors = 0
+```
+
+---
+
+# H. Level_001 Stable Baseline（完成）
+
+Current stable baseline asset:
+
+```text
+Assets/GameConfigs/Levels/Level_001_GameConfig.asset
+```
+
+Verified state:
+
+- [x] `Level_001_GameConfig` exists under `Assets/GameConfigs/Levels/`
+- [x] `GameManager` uses `Level_001_GameConfig`
+- [x] `Level_001` passes Editor Validation
+- [x] `Level_001` has been Play tested to WIN
+- [x] verified Play Mode run had `Console red errors = 0`
+- [x] `RuntimeInvariantValidator` remains active during valid gameplay
+
+Level_001 is the stable baseline for future authored levels.
+
+Do not claim additional level assets exist until they are actually created and verified.
+
+Do not claim multi-level progression exists.
+
+Do not claim procedural generation exists.
+
 ---
 
 # 当前阶段
@@ -131,8 +172,30 @@ System Stabilization and Level Authoring Documentation
 - runtime validation
 - solvability validation
 - progress-driven semantics lock
+- Level_001 stable baseline is recorded
 - level production must follow `docs/level_authoring_guide.md`
 - Editor Validation must pass before committing new levels
+- Play Mode test must reach WIN before committing new levels
+- Console red errors must be 0 before committing new levels
+- RuntimeInvariantValidator remains active
+
+---
+
+# 当前 level authoring workflow
+
+For any new level or edited level:
+
+1. Duplicate a stable `GameConfig`.
+2. Edit level data only.
+3. Run Editor Validation.
+4. Play test to WIN.
+5. Require `Console red errors = 0` before commit.
+
+The current stable source asset for duplication is:
+
+```text
+Assets/GameConfigs/Levels/Level_001_GameConfig.asset
+```
 
 ---
 
@@ -144,13 +207,18 @@ System Stabilization and Level Authoring Documentation
 - [ ] auto-generated layouts
 - [ ] deterministic level generation
 
+These items are not implemented and must not be described as existing gameplay features.
+
 ---
 
 ## Content
 
+- [ ] additional verified level assets
 - [ ] additional patterns
 - [ ] difficulty curves
 - [ ] multi-level progression
+
+These items are not implemented and must not be described as existing gameplay features.
 
 ---
 

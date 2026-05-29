@@ -2,7 +2,7 @@
 
 This guide defines the current level authoring pipeline for the stable gameplay rules.
 
-Level authoring must not change gameplay semantics. A level is valid only when its data fits the existing runtime rules and passes the editor validation workflow.
+Level authoring must not change gameplay semantics. A level is valid only when its data fits the existing runtime rules and passes the editor validation workflow, Play Mode WIN verification, and Console red error check.
 
 ---
 
@@ -20,23 +20,55 @@ A `GameConfig` asset contains the authored data that the runtime uses to start a
 
 When authoring levels, edit the `GameConfig` asset data only. Do not edit runtime gameplay code to make a specific level work.
 
-Recommended level asset location and naming:
+Current stable baseline asset:
 
 ```text
 Assets/GameConfigs/Levels/Level_001_GameConfig.asset
-Assets/GameConfigs/Levels/Level_002_GameConfig.asset
 ```
 
-Continue the same numbering format for additional levels:
+Verified baseline state:
 
-```text
-Assets/GameConfigs/Levels/Level_003_GameConfig.asset
-Assets/GameConfigs/Levels/Level_004_GameConfig.asset
-```
+- `Level_001_GameConfig` exists under `Assets/GameConfigs/Levels/`.
+- `GameManager` uses `Level_001_GameConfig`.
+- `Level_001` passes Editor Validation.
+- `Level_001` has been Play tested to WIN.
+- The verified Play Mode run had `Console red errors = 0`.
+- `RuntimeInvariantValidator` remains active during valid gameplay.
+
+Use `Level_001_GameConfig` as the known stable baseline when starting new level authoring work.
+
+Do not claim another level asset exists until that asset is actually created, validated, Play tested to WIN, and recorded.
 
 ---
 
-## 2. Three-layer structure
+## 2. Required level authoring workflow
+
+For any new level or edited level, use this workflow:
+
+1. Duplicate stable `GameConfig`.
+2. Edit level data.
+3. Run Editor Validation.
+4. Play test to WIN.
+5. Require `Console red errors = 0` before commit.
+
+The current stable `GameConfig` to duplicate is:
+
+```text
+Assets/GameConfigs/Levels/Level_001_GameConfig.asset
+```
+
+This workflow is required for committed level content.
+
+A level is not ready to commit if any of the following is true:
+
+- Editor Validation has not passed.
+- Play Mode has not been tested to WIN.
+- Console red errors are greater than 0.
+- RuntimeInvariantValidator is disabled or bypassed.
+
+---
+
+## 3. Three-layer structure
 
 Every authored level must respect the current three-layer gameplay structure.
 
@@ -86,7 +118,7 @@ The player clicks available SelectionArea tiles. Those tiles enter TempZone and 
 
 ---
 
-## 3. Final resolve rule
+## 4. Final resolve rule
 
 The current stable resolve rule is progress-driven.
 
@@ -133,7 +165,7 @@ Do not replace this formula with another rule while authoring levels.
 
 ---
 
-## 4. Required invariant
+## 5. Required invariant
 
 Every authored level must preserve the runtime invariant for each color.
 
@@ -168,9 +200,11 @@ PatternCount[color] = SelectionAreaCount[color] * 3
 
 This count rule is necessary, but not sufficient. The level must also be playable in order, because SelectionArea unlock order and Pattern bottom-row progression can still create a deadlock.
 
+`RuntimeInvariantValidator` must remain active during valid gameplay. Do not disable it to make level data appear valid.
+
 ---
 
-## 5. SelectionArea authoring rules
+## 6. SelectionArea authoring rules
 
 SelectionArea is the only input source.
 
@@ -198,7 +232,7 @@ A level can have correct total color counts and still fail if the required color
 
 ---
 
-## 6. Pattern authoring rules
+## 7. Pattern authoring rules
 
 Pattern is bottom-row driven.
 
@@ -218,23 +252,22 @@ After a resolve removes Pattern cells, remaining cells fall within their origina
 
 ---
 
-## 7. Validation workflow
+## 8. Editor Validation workflow
 
 Run validation every time any `GameConfig` is edited.
 
-Required workflow:
+Required Editor Validation workflow:
 
-1. Edit the target `GameConfig` asset.
-2. Open the gameplay scene that contains `GameManager`.
-3. Make sure the edited `GameConfig` is the current config used by `GameManager` or by the active `LevelDatabase` entry.
-4. In the Unity top menu, click:
+1. Open the gameplay scene that contains `GameManager`.
+2. Make sure the edited `GameConfig` is the current config used by `GameManager` or by the active level data path.
+3. In the Unity top menu, click:
 
 ```text
 Tools / Eliminate Game / Validate Current Config
 ```
 
-5. Open the Console window.
-6. Confirm the Console shows:
+4. Open the Console window.
+5. Confirm the Console shows:
 
 ```text
 [EDITOR_VALIDATION] PASS
@@ -242,21 +275,33 @@ Tools / Eliminate Game / Validate Current Config
 
 A PASS is required before Play testing.
 
-After validation passes:
+Validation is read-only. It reports invalid authored data; it does not rewrite the level for you.
+
+---
+
+## 9. Play test workflow
+
+After Editor Validation passes:
 
 1. Enter Play Mode.
 2. Play the level manually.
 3. Confirm SelectionArea unlock order works.
 4. Confirm Pattern resolves through bottom-row matches.
 5. Confirm TempZone progress behaves as expected.
-6. Confirm the level reaches WIN without deadlock.
-7. Only commit after both editor validation and Play testing are complete.
+6. Confirm `RuntimeInvariantValidator` remains active during valid gameplay.
+7. Confirm the level reaches WIN without deadlock.
+8. Open the Console window.
+9. Confirm the verified run has:
 
-Validation is read-only. It reports invalid authored data; it does not rewrite the level for you.
+```text
+Console red errors = 0
+```
+
+Only commit after Editor Validation passes, Play Mode reaches WIN, and Console red errors equal 0.
 
 ---
 
-## 8. Level asset naming convention
+## 10. Level asset naming convention
 
 Store authored level configs under:
 
@@ -264,12 +309,22 @@ Store authored level configs under:
 Assets/GameConfigs/Levels/
 ```
 
-Use this naming format:
+Known stable baseline:
+
+```text
+Assets/GameConfigs/Levels/Level_001_GameConfig.asset
+```
+
+Use this naming format for future level assets only after they are actually created:
+
+```text
+Level_###_GameConfig.asset
+```
+
+Examples of the naming pattern:
 
 ```text
 Level_001_GameConfig.asset
-Level_002_GameConfig.asset
-Level_003_GameConfig.asset
 ```
 
 Rules:
@@ -278,10 +333,11 @@ Rules:
 - Keep the `Level_` prefix.
 - Keep the `_GameConfig.asset` suffix.
 - Do not use ambiguous names such as `NewGameConfig.asset`, `Test.asset`, or `Final.asset` for committed level content.
+- Do not claim `Level_002_GameConfig.asset` exists unless that file has actually been created and verified.
 
 ---
 
-## 9. Hard restrictions
+## 11. Hard restrictions
 
 Level authoring must stay data-only unless a separate engineering task explicitly changes gameplay rules.
 
@@ -291,12 +347,17 @@ Do not do any of the following while authoring levels:
 - Do not rely on hidden auto-fix behavior.
 - Do not bypass validation.
 - Do not commit a level that has not passed validation.
-- Do not commit a level that has not been play tested.
+- Do not commit a level that has not been Play tested to WIN.
+- Do not commit a level if Console red errors are greater than 0.
+- Do not disable or bypass RuntimeInvariantValidator.
 - Do not change resolve semantics.
 - Do not change SelectionArea unlock semantics.
 - Do not change Pattern gravity semantics.
 - Do not add diagonal unlock.
 - Do not add cross-column Pattern movement.
 - Do not mutate runtime rules to make one level pass.
+- Do not claim `Level_002` exists until it is actually created and verified.
+- Do not claim multi-level progression exists.
+- Do not claim procedural generation exists.
 
 The level must fit the stable rules. The stable rules must not be changed to fit the level.
