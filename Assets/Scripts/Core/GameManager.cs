@@ -316,7 +316,15 @@ namespace EliminateGame.Core
             resolveStepSequenceId++;
 
             int bottomRowCount = patternController.GetBottomRowCount(selectedColor);
-            int targetSlotProgress = tempZoneController.Slots[tempSlotIndex].ProgressMark;
+            bool slotWasValidBefore = tempSlotIndex >= 0 && tempSlotIndex < tempZoneController.Slots.Count;
+            BlockColor slotColorBefore = slotWasValidBefore
+                ? tempZoneController.Slots[tempSlotIndex].Color
+                : BlockColor.None;
+            int slotProgressBefore = slotWasValidBefore
+                ? tempZoneController.Slots[tempSlotIndex].ProgressMark
+                : 0;
+            int tempSlotCountBefore = tempZoneController.Count;
+            int targetSlotProgress = slotProgressBefore;
             int remainingProgress = Mathf.Clamp(3 - targetSlotProgress, 0, 3);
             int removeCount = bottomRowCount < 3
                 ? bottomRowCount
@@ -325,7 +333,7 @@ namespace EliminateGame.Core
             string tempSlotsBefore = FormatTempSlots();
 
 
-            Debug.Log($"[RESOLVE_DEBUG] ResolveAgainstTempSlot beforeResolve selectedColor={selectedColor} tempSlotIndex={tempSlotIndex}");
+            Debug.Log($"[RESOLVE_DEBUG] ResolveAgainstTempSlot beforeResolve selectedColor={selectedColor} tempSlotIndex={tempSlotIndex} slotWasValidBefore={slotWasValidBefore} slotColorBefore={slotColorBefore} slotProgressBefore={slotProgressBefore} tempSlotCountBefore={tempSlotCountBefore}");
             AssertGameRuntimeSafety("ResolveAgainstTempSlot.BeforePatternResolve", selectedColor, tempSlotIndex);
             Dictionary<BlockColor, int> beforeCounts = BuildPatternAndTempZoneColorCounts();
             PatternResolveResult result = patternController.ResolveAgainstBottomRowWithLimit(selectedColor, removeCount);
@@ -337,16 +345,15 @@ namespace EliminateGame.Core
                 return false;
             }
 
-            bool slotExistedBeforeProgress = IsValidSlotIndexWithColor(tempSlotIndex, selectedColor);
             tempZoneController.ApplyCaseAProgress(tempSlotIndex, result.PatternRemovedCount);
 
+            bool slotRemovedDuringProgress = slotWasValidBefore && slotProgressBefore + result.PatternRemovedCount >= 3;
             bool slotStillExists = IsValidSlotIndexWithColor(tempSlotIndex, selectedColor);
-            bool slotRemovedDuringProgress = slotExistedBeforeProgress && !slotStillExists;
             int safetySlotIndex = slotStillExists ? tempSlotIndex : -1;
             bool validateSlotIndex = slotStillExists;
-            if (!slotStillExists)
+            if (slotRemovedDuringProgress)
             {
-                Debug.Log($"[RESOLVE_DEBUG] Temp slot removed during ApplyCaseAProgress oldSlotIndex={tempSlotIndex}");
+                Debug.Log($"[RESOLVE_DEBUG] Temp slot removed during ApplyCaseAProgress oldSlotIndex={tempSlotIndex} slotColorBefore={slotColorBefore} slotProgressBefore={slotProgressBefore} patternRemovedCount={result.PatternRemovedCount} tempSlotCountBefore={tempSlotCountBefore} tempSlotCountAfter={tempZoneController.Count}");
             }
 
             Dictionary<BlockColor, int> afterResolveCounts = BuildPatternAndTempZoneColorCounts();
