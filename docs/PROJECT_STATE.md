@@ -7,6 +7,14 @@
 
 核心 runtime 系统已跑通。
 
+`Level_001_GameConfig` 是当前已记录的稳定 baseline。
+
+当前稳定 baseline asset 位置：
+
+```text
+Assets/GameConfigs/Levels/Level_001_GameConfig.asset
+```
+
 Level Authoring Guide 已完成，位置：
 
 ```text
@@ -18,6 +26,32 @@ docs/level_authoring_guide.md
 ---
 
 # 当前已验证
+
+## Level_001 Stable Baseline
+
+已验证 baseline：
+
+```text
+Assets/GameConfigs/Levels/Level_001_GameConfig.asset
+```
+
+当前 verified state：
+
+- `Level_001_GameConfig` exists under `Assets/GameConfigs/Levels/`
+- `GameManager` uses `Level_001_GameConfig`
+- `Level_001` passes Editor Validation
+- `Level_001` has been Play tested to WIN
+- verified Play Mode run had `Console red errors = 0`
+- `RuntimeInvariantValidator` remains active during valid gameplay
+
+说明：
+- `Level_001_GameConfig` 是当前稳定关卡数据 baseline。
+- 该 baseline 可作为后续关卡制作时复制的起点。
+- 不声明 `Level_002` 已存在。
+- 不声明 multi-level progression 已存在。
+- 不声明 procedural generation 已存在。
+
+---
 
 ## Gameplay
 
@@ -44,11 +78,13 @@ docs/level_authoring_guide.md
 
 公式：
 
+```text
 removeCount =
   if bottomRowCount < 3:
     bottomRowCount
   else:
     min(bottomRowCount, 3 - currentTempSlotProgress)
+```
 
 ---
 
@@ -59,6 +95,7 @@ removeCount =
 - runtime assertions 生效
 - count consistency 已验证
 - deterministic solvability validation 已接入 GameManager.StartRun()
+- RuntimeInvariantValidator remains active during valid gameplay
 
 ---
 
@@ -101,6 +138,21 @@ docs/level_authoring_guide.md
 - 保持 column gravity
 - 保持 no cross-column movement
 - 保持 progress-driven resolve formula
+- 保持 RuntimeInvariantValidator active
+
+当前 workflow：
+
+1. duplicate stable GameConfig
+2. edit level data
+3. run Editor Validation
+4. Play test to WIN
+5. require Console red errors = 0 before commit
+
+当前 stable GameConfig 是：
+
+```text
+Assets/GameConfigs/Levels/Level_001_GameConfig.asset
+```
 
 提交新关卡或编辑后的关卡前，必须运行 Editor Validation：
 
@@ -116,10 +168,17 @@ Unity Console 必须显示：
 
 Editor Validation 通过后，还必须 Play test 并确认关卡可以到达 WIN，没有 deadlock。
 
+Play test verified run 必须满足：
+
+```text
+Console red errors = 0
+```
+
 ---
 
 ## Runtime Invariant（核心）
 
+```text
 PatternRemaining[color]
 =
 SelectionRemaining[color] * 3
@@ -129,9 +188,11 @@ TempDebt[color]
 TempDebt[color]
 =
 sum(3 - TempZoneSlot.ProgressMark for same color)
+```
 
 说明：
 - invariant 在每次 resolve 与 auto resolve chain 中持续成立。
+- RuntimeInvariantValidator remains active during valid gameplay.
 
 ---
 
@@ -142,15 +203,19 @@ sum(3 - TempZoneSlot.ProgressMark for same color)
 - input lock
 - WIN cleanup
 
+Level_001 has been Play tested to WIN.
+
 ---
 
 # 当前可通关规则
 
 ## 总数量
 
+```text
 PatternCount[color]
 =
 SelectionAreaCount[color] * 3
+```
 
 ---
 
@@ -161,6 +226,8 @@ SelectionAreaCount[color] * 3
 - reachable colors
 - bottom-row progression
 - endgame color availability
+
+Level_001 verified run reaches WIN.
 
 ---
 
@@ -178,6 +245,7 @@ SelectionAreaCount[color] * 3
 - procedural generation 未完成。
 - next-level flow 未声明完成。
 - multi-level progression 未声明完成。
+- `Level_002` 未声明存在。
 
 ---
 
@@ -200,3 +268,8 @@ SelectionAreaCount[color] * 3
 - 私自修改 resolve chain
 - 未按照 `docs/level_authoring_guide.md` 制作或编辑关卡
 - 在 Editor Validation 未通过时提交新关卡或编辑后的关卡
+- 在 Play test 未到达 WIN 时提交新关卡或编辑后的关卡
+- 在 Console red errors 不为 0 时提交新关卡或编辑后的关卡
+- 声称 `Level_002` 存在，除非该 asset 已实际创建并验证
+- 声称 multi-level progression 存在
+- 声称 procedural generation 存在
