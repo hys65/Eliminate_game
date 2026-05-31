@@ -23,9 +23,12 @@ namespace EliminateGame.Core
 
         [Header("Safety")]
         [SerializeField, Min(1)] private int autoResolveSafetyLimit = 128;
+        [SerializeField] private bool muteUnityInfoLogsDuringAutoResolve = true;
 
         [Header("Debug")]
         [SerializeField] private int rescueRandomSeed = 12345;
+        [SerializeField] private bool resolveDebugLogsEnabled = false;
+        [SerializeField, Min(1)] private int resolveDebugLogLimitPerClick = 12;
 
         private System.Random rescueRandom;
         private int rescueUses;
@@ -35,6 +38,8 @@ namespace EliminateGame.Core
         private GameConfig activeGameConfig;
         private int resolveClickSequenceId;
         private int resolveStepSequenceId;
+        private int resolveDebugLogsThisClick;
+        private bool resolveDebugLogLimitWarningEmitted;
 
         public GameState State { get; private set; } = GameState.None;
         public int RescueUses => rescueUses;
@@ -166,16 +171,18 @@ namespace EliminateGame.Core
 
             resolveClickSequenceId++;
             resolveStepSequenceId = 0;
-            Debug.Log($"[RESOLVE_DEBUG] OnSelectionAreaTileSelected clickedColor={tile.Color} tempZoneCountBeforeAdd={tempZoneController.Count}");
+            resolveDebugLogsThisClick = 0;
+            resolveDebugLogLimitWarningEmitted = false;
+            ResolveDebugLog($"[RESOLVE_DEBUG] OnSelectionAreaTileSelected clickedColor={tile.Color} tempZoneCountBeforeAdd={tempZoneController.Count}");
             int tempSlotIndex = tempZoneController.AddTile(tile.Color);
             if (tempSlotIndex < 0)
             {
-                Debug.Log($"[RESOLVE_DEBUG] OnSelectionAreaTileSelected addFailed tempZoneCountAfterAdd={tempZoneController.Count}");
+                ResolveDebugLog($"[RESOLVE_DEBUG] OnSelectionAreaTileSelected addFailed tempZoneCountAfterAdd={tempZoneController.Count}");
                 EvaluateStateAfterAction();
                 return;
             }
 
-            Debug.Log($"[RESOLVE_DEBUG] OnSelectionAreaTileSelected tempZoneCountAfterAdd={tempZoneController.Count} addedSlotIndex={tempSlotIndex}");
+            ResolveDebugLog($"[RESOLVE_DEBUG] OnSelectionAreaTileSelected tempZoneCountAfterAdd={tempZoneController.Count} addedSlotIndex={tempSlotIndex}");
 
             AssertGameRuntimeSafety("OnSelectionAreaTileSelected.BeforeConsume", tile.Color, tempSlotIndex);
             selectionAreaGridController.ConsumeTileAndUnlockCrossNeighbors(tile);
@@ -187,23 +194,53 @@ namespace EliminateGame.Core
 
         private void ResolvePatternUsingTempZoneChain(BlockColor selectedColor, int tempSlotIndex)
         {
-            TryResolveSelectedColorFirst(selectedColor, tempSlotIndex);
+            LogType previousFilter = Debug.unityLogger.filterLogType;
+            bool shouldRestoreFilter = muteUnityInfoLogsDuringAutoResolve
+                                       && !resolveDebugLogsEnabled
+                                       && previousFilter == LogType.Log;
 
-            int iterationLimit = Mathf.Max(1, autoResolveSafetyLimit);
-            for (int iteration = 0; iteration < iterationLimit; iteration++)
+            if (shouldRestoreFilter)
             {
-                IReadOnlyList<BlockColor> loopBottomRowColors = patternController.GetBottomRowColors();
-                string bottomRowColorLog = loopBottomRowColors.Count > 0 ? string.Join(",", loopBottomRowColors) : "<empty>";
-                string tempSlotLog = tempZoneController.Slots.Count > 0
-                    ? string.Join(" | ", tempZoneController.Slots.Select((slot, idx) => $"[{idx}] {slot.Color} p={slot.ProgressMark}"))
-                    : "<empty>";
+                Debug.unityLogger.filterLogType = LogType.Warning;
+            }
 
-                bool hasMatch = tempZoneController.TryFindMatchingSlot(new HashSet<BlockColor>(loopBottomRowColors), out int matchingSlotIndex, out BlockColor matchingColor);
-                Debug.Log($"[RESOLVE_DEBUG] ResolvePatternUsingTempZoneChain iteration={iteration} bottomRowColors=[{bottomRowColorLog}] tempSlots=[{tempSlotLog}] tryFindMatchingSlot={hasMatch} matchingSlotIndex={matchingSlotIndex} matchingColor={matchingColor}");
+            try
+            {
+                TryResolveSelectedColorFirst(selectedColor, tempSlotIndex);
 
-                if (!TryResolveAnyTempSlotForCurrentBottomRow())
+                int iterationLimit = Mathf.Max(1, autoResolveSafetyLimit);
+                bool stoppedBySafetyBudget = true;
+                for (int iteration = 0; iteration < iterationLimit; iteration++)
                 {
-                    break;
+                    IReadOnlyList<BlockColor> loopBottomRowColors = patternController.GetBottomRowColors();
+                    string bottomRowColorLog = loopBottomRowColors.Count > 0 ? string.Join(",", loopBottomRowColors) : "<empty>";
+                    string tempSlotLog = tempZoneController.Slots.Count > 0
+                        ? string.Join(" | ", tempZoneController.Slots.Select((slot, idx) => $"[{idx}] {slot.Color} p={slot.ProgressMark}"))
+                        : "<empty>";
+
+                    bool hasMatch = tempZoneController.TryFindMatchingSlot(new HashSet<BlockColor>(loopBottomRowColors), out int matchingSlotIndex, out BlockColor matchingColor);
+                    ResolveDebugLog($"[RESOLVE_DEBUG] ResolvePatternUsingTempZoneChain iteration={iteration} bottomRowColors=[{bottomRowColorLog}] tempSlots=[{tempSlotLog}] tryFindMatchingSlot={hasMatch} matchingSlotIndex={matchingSlotIndex} matchingColor={matchingColor}");
+
+                    if (!TryResolveAnyTempSlotForCurrentBottomRow())
+                    {
+                        stoppedBySafetyBudget = false;
+                        break;
+                    }
+                }
+
+                if (stoppedBySafetyBudget && HasPendingAutoResolveCandidate())
+                {
+                    Debug.LogWarning(
+                        $"[RUNTIME_SAFETY] Auto resolve chain stopped after reaching autoResolveSafetyLimit={iterationLimit}. " +
+                        "The chain was stopped by the safety budget; gameplay rules were not changed. " +
+                        "Reduce level size or increase autoResolveSafetyLimit only after validation.");
+                }
+            }
+            finally
+            {
+                if (shouldRestoreFilter)
+                {
+                    Debug.unityLogger.filterLogType = previousFilter;
                 }
             }
 
@@ -238,9 +275,41 @@ namespace EliminateGame.Core
                 return false;
             }
 
-            string bottomRowColorLog = bottomRowColors.Count > 0 ? string.Join(",", bottomRowColors) : "<empty>";
-
             return ResolveAgainstTempSlot(color, slotIndex);
+        }
+
+        private bool HasPendingAutoResolveCandidate()
+        {
+            IReadOnlyList<BlockColor> bottomRowColors = patternController.GetBottomRowColors();
+            if (bottomRowColors.Count == 0)
+            {
+                return false;
+            }
+
+            return tempZoneController.HasAnyColorInSet(new HashSet<BlockColor>(bottomRowColors));
+        }
+
+        private void ResolveDebugLog(string message)
+        {
+            if (!resolveDebugLogsEnabled)
+            {
+                return;
+            }
+
+            int limit = Mathf.Max(1, resolveDebugLogLimitPerClick);
+            if (resolveDebugLogsThisClick >= limit)
+            {
+                if (!resolveDebugLogLimitWarningEmitted)
+                {
+                    Debug.LogWarning($"[RESOLVE_DEBUG] Per-click resolve debug log limit reached. Suppressing additional GameManager resolve debug logs for clickSequence={resolveClickSequenceId}. Limit={limit}.");
+                    resolveDebugLogLimitWarningEmitted = true;
+                }
+
+                return;
+            }
+
+            Debug.Log(message);
+            resolveDebugLogsThisClick++;
         }
 
         private bool IsValidSlotIndexWithColor(int slotIndex, BlockColor color)
@@ -333,13 +402,13 @@ namespace EliminateGame.Core
             string tempSlotsBefore = FormatTempSlots();
 
 
-            Debug.Log($"[RESOLVE_DEBUG] ResolveAgainstTempSlot beforeResolve selectedColor={selectedColor} tempSlotIndex={tempSlotIndex} slotWasValidBefore={slotWasValidBefore} slotColorBefore={slotColorBefore} slotProgressBefore={slotProgressBefore} tempSlotCountBefore={tempSlotCountBefore}");
+            ResolveDebugLog($"[RESOLVE_DEBUG] ResolveAgainstTempSlot beforeResolve selectedColor={selectedColor} tempSlotIndex={tempSlotIndex} slotWasValidBefore={slotWasValidBefore} slotColorBefore={slotColorBefore} slotProgressBefore={slotProgressBefore} tempSlotCountBefore={tempSlotCountBefore}");
             AssertGameRuntimeSafety("ResolveAgainstTempSlot.BeforePatternResolve", selectedColor, tempSlotIndex);
             Dictionary<BlockColor, int> beforeCounts = BuildPatternAndTempZoneColorCounts();
             PatternResolveResult result = patternController.ResolveAgainstBottomRowWithLimit(selectedColor, removeCount);
             string patternCountsAfterPatternResolve = FormatColorCounts(patternController.GetNonNoneColorCounts());
             string tempSlotsBeforeMutation = FormatTempSlots();
-            Debug.Log($"[RESOLVE_DEBUG] ResolveAgainstTempSlot afterResolve matched={result.Matched} isCaseA={result.IsCaseA} patternRemovedCount={result.PatternRemovedCount}");
+            ResolveDebugLog($"[RESOLVE_DEBUG] ResolveAgainstTempSlot afterResolve matched={result.Matched} isCaseA={result.IsCaseA} patternRemovedCount={result.PatternRemovedCount}");
             if (!result.Matched)
             {
                 return false;
@@ -353,7 +422,7 @@ namespace EliminateGame.Core
             bool validateSlotIndex = slotStillExists;
             if (slotRemovedDuringProgress)
             {
-                Debug.Log($"[RESOLVE_DEBUG] Temp slot removed during ApplyCaseAProgress oldSlotIndex={tempSlotIndex} slotColorBefore={slotColorBefore} slotProgressBefore={slotProgressBefore} patternRemovedCount={result.PatternRemovedCount} tempSlotCountBefore={tempSlotCountBefore} tempSlotCountAfter={tempZoneController.Count}");
+                ResolveDebugLog($"[RESOLVE_DEBUG] Temp slot removed during ApplyCaseAProgress oldSlotIndex={tempSlotIndex} slotColorBefore={slotColorBefore} slotProgressBefore={slotProgressBefore} patternRemovedCount={result.PatternRemovedCount} tempSlotCountBefore={tempSlotCountBefore} tempSlotCountAfter={tempZoneController.Count}");
             }
 
             Dictionary<BlockColor, int> afterResolveCounts = BuildPatternAndTempZoneColorCounts();
