@@ -37,6 +37,8 @@ Verified baseline state:
 
 Use `Level_001_GameConfig` as the known stable baseline when starting new level authoring work.
 
+`Level_002_GameConfig` exists and has been verified by the user as the first small safe expansion prototype. It is documented as data-only authored `GameConfig` content, not as a large-level support milestone and not as the new large-level baseline.
+
 Do not claim another level asset exists until that asset is actually created, validated, Play tested to WIN, and recorded.
 
 ---
@@ -65,6 +67,57 @@ A level is not ready to commit if any of the following is true:
 - Play Mode has not been tested to WIN.
 - Console red errors are greater than 0.
 - RuntimeInvariantValidator is disabled or bypassed.
+
+---
+
+## 2.1 Verified small expansion prototype: Level_002
+
+Verified small expansion prototype asset:
+
+```text
+Assets/GameConfigs/Levels/Level_002_GameConfig.asset
+```
+
+User-verified status:
+
+- `Level_002_GameConfig` exists.
+- Green color was added.
+- Unity compile has no red errors.
+- Editor Validation passed.
+- Play Mode has no red errors.
+- `Level_002` is still within temporary safe prototype limits.
+
+Current Level_002 temporary safe limits:
+
+- Pattern non-None cells = 27.
+- SelectionArea tiles = 9.
+- Pattern non-None cells <= 45.
+- SelectionArea tiles <= 15.
+
+Color counts:
+
+| Area | Red | Blue | Green | Yellow | Purple |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Pattern | 6 | 6 | 3 | 6 | 6 |
+| SelectionArea | 2 | 2 | 1 | 2 | 2 |
+
+Invariant status:
+
+```text
+PatternCount[color] = SelectionAreaCount[color] * 3
+```
+
+This holds for all colors in `Level_002`.
+
+Scope rules for Level_002:
+
+- `Level_002` is a safe small prototype.
+- `Level_002` is data-only authored `GameConfig` content.
+- `Level_002` is the first verified small expansion prototype.
+- `Level_002` is not the new large-level baseline.
+- `Level_002` is not a large-level support milestone.
+- `Level_002` is not procedural generation.
+- `Level_002` is not multi-level progression.
 
 ---
 
@@ -315,6 +368,12 @@ Known stable baseline:
 Assets/GameConfigs/Levels/Level_001_GameConfig.asset
 ```
 
+First verified small expansion prototype:
+
+```text
+Assets/GameConfigs/Levels/Level_002_GameConfig.asset
+```
+
 Use this naming format for future level assets only after they are actually created:
 
 ```text
@@ -333,7 +392,8 @@ Rules:
 - Keep the `Level_` prefix.
 - Keep the `_GameConfig.asset` suffix.
 - Do not use ambiguous names such as `NewGameConfig.asset`, `Test.asset`, or `Final.asset` for committed level content.
-- Do not claim `Level_002_GameConfig.asset` exists unless that file has actually been created and verified.
+- `Level_002_GameConfig.asset` exists and has been verified by the user as a small safe prototype.
+- Do not claim any later level asset exists unless that file has actually been created and verified.
 
 ---
 
@@ -356,8 +416,11 @@ Do not do any of the following while authoring levels:
 - Do not add diagonal unlock.
 - Do not add cross-column Pattern movement.
 - Do not mutate runtime rules to make one level pass.
-- Do not claim `Level_002` exists until it is actually created and verified.
+- Do not create oversized levels yet.
+- Do not exceed Pattern non-None cells <= 45.
+- Do not exceed SelectionArea tiles <= 15.
+- Do not claim `Level_002` is large-level support or a new large-level baseline.
 - Do not claim multi-level progression exists.
 - Do not claim procedural generation exists.
 
-The level must fit the stable rules. The stable rules must not be changed to fit the level.
+The level must fit the stable rules. The stable rules must not be changed to fit the level. Large-level support is still not production-ready. Resolve-chain budget, log throttling, and performance caps still need further testing before scaling up.
