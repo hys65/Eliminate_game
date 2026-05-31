@@ -163,6 +163,52 @@ Do not claim procedural generation exists.
 
 ---
 
+# I. Level_002 Safe Small Prototype（完成）
+
+Current verified small expansion prototype asset:
+
+```text
+Assets/GameConfigs/Levels/Level_002_GameConfig.asset
+```
+
+Verified by user:
+
+- [x] `Level_002_GameConfig` exists under `Assets/GameConfigs/Levels/`
+- [x] Green color was added
+- [x] Unity compile has no red errors
+- [x] Editor Validation passed
+- [x] Play Mode has no red errors
+- [x] `Level_002` remains within temporary safe prototype limits
+- [x] `Level_002` is data-only authored `GameConfig` content
+- [x] `Level_002` is the first verified small expansion prototype
+
+Current Level_002 limits and counts:
+
+- Pattern non-None cells = 27
+- SelectionArea tiles = 9
+- Pattern non-None cells <= 45
+- SelectionArea tiles <= 15
+- Pattern Red = 6, Blue = 6, Green = 3, Yellow = 6, Purple = 6
+- SelectionArea Red = 2, Blue = 2, Green = 1, Yellow = 2, Purple = 2
+- `PatternCount[color] = SelectionAreaCount[color] * 3` holds for all colors
+
+Scope:
+
+- `Level_002` is not a large-level support milestone.
+- `Level_002` is not the new large-level baseline.
+- `Level_002` is not procedural generation.
+- `Level_002` is not multi-level progression.
+
+Temporary scaling warnings remain active:
+
+- Do not create oversized levels yet.
+- Do not exceed Pattern non-None cells <= 45.
+- Do not exceed SelectionArea tiles <= 15.
+- Large-level support is still not production-ready.
+- Resolve-chain budget, log throttling, and performance caps still need further testing before scaling up.
+
+---
+
 # 当前阶段
 
 System Stabilization and Level Authoring Documentation
@@ -173,6 +219,7 @@ System Stabilization and Level Authoring Documentation
 - solvability validation
 - progress-driven semantics lock
 - Level_001 stable baseline is recorded
+- Level_002 first verified small expansion prototype is recorded
 - level production must follow `docs/level_authoring_guide.md`
 - Editor Validation must pass before committing new levels
 - Play Mode test must reach WIN before committing new levels
@@ -213,6 +260,7 @@ These items are not implemented and must not be described as existing gameplay f
 
 ## Content
 
+- [x] first verified small expansion prototype: `Level_002_GameConfig`
 - [ ] additional verified level assets
 - [ ] additional patterns
 - [ ] difficulty curves

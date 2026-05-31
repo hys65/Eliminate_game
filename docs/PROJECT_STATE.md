@@ -9,6 +9,8 @@
 
 `Level_001_GameConfig` 是当前已记录的稳定 baseline。
 
+`Level_002_GameConfig` 是用户已验证的第一个 small safe expansion prototype。它不是新的 large-level baseline。
+
 当前稳定 baseline asset 位置：
 
 ```text
@@ -47,9 +49,71 @@ Assets/GameConfigs/Levels/Level_001_GameConfig.asset
 说明：
 - `Level_001_GameConfig` 是当前稳定关卡数据 baseline。
 - 该 baseline 可作为后续关卡制作时复制的起点。
-- 不声明 `Level_002` 已存在。
+- `Level_002_GameConfig` 已存在并已由用户验证为 small safe expansion prototype。
+- `Level_002` 不是新的 large-level baseline。
 - 不声明 multi-level progression 已存在。
 - 不声明 procedural generation 已存在。
+
+---
+
+## Level_002 Safe Small Prototype
+
+已由用户验证的 small safe expansion prototype：
+
+```text
+Assets/GameConfigs/Levels/Level_002_GameConfig.asset
+```
+
+当前 verified state：
+
+- `Level_002_GameConfig` exists under `Assets/GameConfigs/Levels/`
+- Green color was added
+- Unity compile has no red errors
+- Editor Validation passed
+- Play Mode has no red errors
+- `Level_002` remains within the current temporary safe prototype limits
+- `Level_002` is data-only authored `GameConfig` content
+- `Level_002` is the first verified small expansion prototype
+
+Current temporary safe prototype limits：
+
+- Pattern non-None cells = 27
+- SelectionArea tiles = 9
+- Pattern non-None cells <= 45
+- SelectionArea tiles <= 15
+
+Color counts：
+
+Pattern：
+
+- Red = 6
+- Blue = 6
+- Green = 3
+- Yellow = 6
+- Purple = 6
+
+SelectionArea：
+
+- Red = 2
+- Blue = 2
+- Green = 1
+- Yellow = 2
+- Purple = 2
+
+Invariant：
+
+```text
+PatternCount[color] = SelectionAreaCount[color] * 3
+```
+
+This holds for all colors in `Level_002`.
+
+Scope warning：
+
+- `Level_002` is not a large-level support milestone.
+- `Level_002` is not procedural generation.
+- `Level_002` is not multi-level progression.
+- `Level_002` does not prove large-level support is production-ready.
 
 ---
 
@@ -233,6 +297,14 @@ Level_001 verified run reaches WIN.
 
 # 当前已知限制
 
+Temporary safe prototype limits remain active:
+
+- Do not create oversized levels yet.
+- Do not exceed Pattern non-None cells <= 45.
+- Do not exceed SelectionArea tiles <= 15.
+- Large-level support is still not production-ready.
+- Resolve-chain budget, log throttling, and performance caps still need further testing before scaling up.
+
 尚未 production-ready：
 
 - polished UI
@@ -245,7 +317,7 @@ Level_001 verified run reaches WIN.
 - procedural generation 未完成。
 - next-level flow 未声明完成。
 - multi-level progression 未声明完成。
-- `Level_002` 未声明存在。
+- `Level_002` 已由用户验证为 small safe expansion prototype，但不是 large-level support milestone。
 
 ---
 
@@ -270,6 +342,6 @@ Level_001 verified run reaches WIN.
 - 在 Editor Validation 未通过时提交新关卡或编辑后的关卡
 - 在 Play test 未到达 WIN 时提交新关卡或编辑后的关卡
 - 在 Console red errors 不为 0 时提交新关卡或编辑后的关卡
-- 声称 `Level_002` 存在，除非该 asset 已实际创建并验证
+- 将 `Level_002` 描述为 large-level support milestone 或新的 large-level baseline
 - 声称 multi-level progression 存在
 - 声称 procedural generation 存在

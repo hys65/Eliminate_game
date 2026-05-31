@@ -231,6 +231,78 @@ TempZone 不允许继续保留该颜色。
 
 ---
 
+# 当前已验证关卡资产
+
+## Level_001 stable baseline
+
+```text
+Assets/GameConfigs/Levels/Level_001_GameConfig.asset
+```
+
+`Level_001` 保持当前稳定 baseline。
+
+## Level_002 safe small prototype
+
+```text
+Assets/GameConfigs/Levels/Level_002_GameConfig.asset
+```
+
+用户已验证：
+
+- `Level_002_GameConfig` exists。
+- Green color was added。
+- Unity compile has no red errors。
+- Editor Validation passed。
+- Play Mode has no red errors。
+- `Level_002` is still within temporary safe prototype limits。
+
+当前 `Level_002` 限制：
+
+- Pattern non-None cells = 27
+- SelectionArea tiles = 9
+- Pattern non-None cells <= 45
+- SelectionArea tiles <= 15
+
+颜色数量：
+
+Pattern：
+
+- Red = 6
+- Blue = 6
+- Green = 3
+- Yellow = 6
+- Purple = 6
+
+SelectionArea：
+
+- Red = 2
+- Blue = 2
+- Green = 1
+- Yellow = 2
+- Purple = 2
+
+不变量：
+
+```text
+PatternCount[color] = SelectionAreaCount[color] * 3
+```
+
+该不变量对 `Level_002` 所有颜色成立。
+
+`Level_002` 是 data-only authored `GameConfig`，是第一个 verified small expansion prototype。
+
+`Level_002` 不是 large-level support milestone，不是新的 large-level baseline，不是 procedural generation，不是 multi-level progression。
+
+Scaling warning：
+
+- Do not create oversized levels yet.
+- Do not exceed Pattern non-None cells <= 45.
+- Do not exceed SelectionArea tiles <= 15.
+- Large-level support is still not production-ready.
+- Resolve-chain budget, log throttling, and performance caps still need further testing before scaling up.
+
+---
+
 # 开发原则（必须遵守）
 
 - Docs 是唯一事实源。
