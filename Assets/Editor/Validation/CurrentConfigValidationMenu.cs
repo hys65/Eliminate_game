@@ -16,6 +16,8 @@ namespace EliminateGame.Editor.Validation
     {
         private const string MenuPath = "Tools/Eliminate Game/Validate Current Config";
         private const string LogPrefix = "[EDITOR_VALIDATION]";
+        private const int MaxSafePatternCells = 45;
+        private const int MaxSafeSelectionTiles = 15;
 
         [MenuItem(MenuPath)]
         public static void ValidateCurrentConfig()
@@ -42,6 +44,14 @@ namespace EliminateGame.Editor.Validation
             List<string> errors = new List<string>();
             Dictionary<BlockColor, int> patternCounts = BuildPatternCounts(config);
             Dictionary<BlockColor, int> selectionCounts = BuildSelectionCounts(config);
+            int patternCellCount = patternCounts.Values.Sum();
+            int selectionTileCount = CalculateSelectionTileCount(config);
+
+            if (ExceedsCurrentSafePrototypeLimit(patternCellCount, selectionTileCount))
+            {
+                Debug.LogError(BuildPrototypeSizeLimitFailure(patternCellCount, selectionTileCount));
+                return;
+            }
 
             ValidatePatternNotEmpty(patternCounts, errors);
             ValidateInitialSelectableTile(config, errors);
@@ -153,6 +163,38 @@ namespace EliminateGame.Editor.Validation
             }
 
             return counts;
+        }
+
+        private static int CalculateSelectionTileCount(GameConfig config)
+        {
+            int tileCount = 0;
+
+            foreach (GameConfig.SelectionTileDefinition tile in config.SelectionTiles)
+            {
+                if (tile == null || tile.Color == BlockColor.None)
+                {
+                    continue;
+                }
+
+                tileCount++;
+            }
+
+            return tileCount;
+        }
+
+        private static bool ExceedsCurrentSafePrototypeLimit(int patternCellCount, int selectionTileCount)
+        {
+            return patternCellCount > MaxSafePatternCells ||
+                selectionTileCount > MaxSafeSelectionTiles;
+        }
+
+        private static string BuildPrototypeSizeLimitFailure(int patternCellCount, int selectionTileCount)
+        {
+            StringBuilder builder = new StringBuilder();
+            builder.AppendLine("[EDITOR_VALIDATION] FAILED: Level size exceeds current safe prototype limit.");
+            builder.AppendLine($"PatternCells={patternCellCount} Max={MaxSafePatternCells}");
+            builder.Append($"SelectionTiles={selectionTileCount} Max={MaxSafeSelectionTiles}");
+            return builder.ToString();
         }
 
         private static void ValidatePatternNotEmpty(Dictionary<BlockColor, int> patternCounts, List<string> errors)
