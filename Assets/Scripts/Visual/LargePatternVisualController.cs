@@ -44,6 +44,8 @@ namespace EliminateGame.Visual
             float xOffset = (visualConfig.Width - 1) * step * 0.5f;
             float yOffset = (visualConfig.Height - 1) * step * 0.5f;
 
+            int nonNoneCellCount = 0;
+
             for (int y = 0; y < visualConfig.Height; y++)
             {
                 for (int x = 0; x < visualConfig.Width; x++)
@@ -54,6 +56,7 @@ namespace EliminateGame.Visual
                         continue;
                     }
 
+                    nonNoneCellCount++;
                     SpriteRenderer renderer = CreateVisualCell(root, color);
                     if (renderer == null)
                     {
@@ -71,6 +74,8 @@ namespace EliminateGame.Visual
                     visualCells.Add(renderer);
                 }
             }
+
+            Debug.Log($"[LargePatternVisual] Built visual grid Width={visualConfig.Width} Height={visualConfig.Height} NonNoneCells={nonNoneCellCount}", this);
         }
 
         [ContextMenu("Clear Visual Grid")]
