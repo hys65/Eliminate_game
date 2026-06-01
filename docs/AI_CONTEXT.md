@@ -293,13 +293,108 @@ PatternCount[color] = SelectionAreaCount[color] * 3
 
 `Level_002` 不是 large-level support milestone，不是新的 large-level baseline，不是 procedural generation，不是 multi-level progression。
 
+
+## Level_003 verified small safe prototype
+
+```text
+Assets/GameConfigs/Levels/Level_003_GameConfig.asset
+```
+
+用户已验证：
+
+- `Level_003_GameConfig` exists。
+- Editor Validation = PASS。
+- Play Mode result = WIN。
+- Play Mode initializes visible gameplay content。
+- MaxSearchNodes error no longer appears。
+- Menu -> Restart = normal。
+- Restart after Menu shows gameplay content again。
+- Console red errors = 0。
+- `Level_003` is data-only authored `GameConfig` content。
+- `Level_003` is the second verified small expansion prototype after `Level_002`。
+
+最终 verified design：
+
+- Pattern non-None cells = 36。
+- SelectionArea tiles = 12。
+- Pattern dimensions = 6 rows x 6 columns。
+- SelectionArea dimensions = 4 columns x 3 rows。
+- 4 colors only。
+- Purple is not used。
+- Red remains dominant or tied-dominant。
+- Pattern is visually mixed。
+- Pattern is no longer 14x3。
+- Pattern is no longer uniform same-color rows。
+- Pattern fits screen better than the rejected 14x3 version。
+
+颜色数量：
+
+Pattern：
+
+- Red = 12
+- Blue = 9
+- Green = 9
+- Yellow = 6
+- Purple = 0
+
+SelectionArea：
+
+- Red = 4
+- Blue = 3
+- Green = 3
+- Yellow = 2
+- Purple = 0
+
+不变量：
+
+```text
+PatternCount[color] = SelectionAreaCount[color] * 3
+```
+
+该不变量对 `Level_003` 所有颜色成立。
+
+Level_003 history：
+
+- Rejected attempt: Pattern non-None cells = 42。
+- Rejected attempt: SelectionArea tiles = 14。
+- Rejected attempt: 4 colors only。
+- Rejected attempt: Purple was not used。
+- Rejected attempt failed deterministic solvability validation because search exceeded `MaxSearchNodes = 200000`。
+- Observed error:
+
+```text
+[SOLVABILITY_VALIDATION][GameManager.StartRun] FAILED
+Solvability search exceeded MaxSearchNodes=200000.
+This level may be too complex for deterministic validation.
+```
+
+Fix record：
+
+- `Level_003` was simplified to Pattern non-None cells = 36。
+- `Level_003` was simplified to SelectionArea tiles = 12。
+- The fix was data-only。
+- Validation was not weakened。
+- `MaxSearchNodes` was not increased。
+- `DeterministicSolvabilityValidator` was not bypassed。
+
+Scope warning：
+
+- `Level_003` is a small safe prototype。
+- `Level_003` is not a large-level support milestone。
+- `Level_003` is not procedural generation。
+- `Level_003` is not multi-level progression。
+- `Level_003` is not the new large-level baseline。
+- `Level_003` does not prove production-ready scaling。
+
 Scaling warning：
 
 - Do not create oversized levels yet.
 - Do not exceed Pattern non-None cells <= 45.
 - Do not exceed SelectionArea tiles <= 15.
 - Large-level support is still not production-ready.
-- Resolve-chain budget, log throttling, and performance caps still need further testing before scaling up.
+- Resolve-chain budget, log throttling, deterministic validation search budget, and performance caps still need further testing before scaling up.
+- Random-looking mixed layouts can still explode deterministic solvability search complexity.
+- For now, level growth must remain gradual and validation-budget-friendly.
 
 ---
 

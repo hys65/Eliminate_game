@@ -11,6 +11,8 @@
 
 `Level_002_GameConfig` 是用户已验证的第一个 small safe expansion prototype。它不是新的 large-level baseline。
 
+`Level_003_GameConfig` 是用户已验证的第二个 small safe expansion prototype。它不是新的 large-level baseline，不是 large-level support milestone，也不证明 production-ready scaling。
+
 当前稳定 baseline asset 位置：
 
 ```text
@@ -114,6 +116,102 @@ Scope warning：
 - `Level_002` is not procedural generation.
 - `Level_002` is not multi-level progression.
 - `Level_002` does not prove large-level support is production-ready.
+
+---
+
+## Level_003 Verified Small Safe Prototype
+
+已由用户验证的第二个 small safe expansion prototype：
+
+```text
+Assets/GameConfigs/Levels/Level_003_GameConfig.asset
+```
+
+当前 verified state：
+
+- `Level_003_GameConfig` exists under `Assets/GameConfigs/Levels/`
+- Editor Validation = PASS
+- Play Mode result = WIN
+- Play Mode initializes visible gameplay content
+- MaxSearchNodes error no longer appears
+- Menu -> Restart = normal
+- Restart after Menu shows gameplay content again
+- Console red errors = 0
+- `Level_003` is data-only authored `GameConfig` content
+- `Level_003` is the second verified small expansion prototype after `Level_002`
+
+Current verified design：
+
+- Pattern non-None cells = 36
+- SelectionArea tiles = 12
+- Pattern dimensions = 6 rows x 6 columns
+- SelectionArea dimensions = 4 columns x 3 rows
+- 4 colors only
+- Purple is not used
+- Red remains dominant or tied-dominant
+- Pattern is visually mixed
+- Pattern is no longer 14x3
+- Pattern is no longer uniform same-color rows
+- Pattern fits screen better than the rejected 14x3 version
+
+Color counts：
+
+Pattern：
+
+- Red = 12
+- Blue = 9
+- Green = 9
+- Yellow = 6
+- Purple = 0
+
+SelectionArea：
+
+- Red = 4
+- Blue = 3
+- Green = 3
+- Yellow = 2
+- Purple = 0
+
+Invariant：
+
+```text
+PatternCount[color] = SelectionAreaCount[color] * 3
+```
+
+This holds for all colors in `Level_003`.
+
+Rejected Level_003 history：
+
+- Original attempt used Pattern non-None cells = 42
+- Original attempt used SelectionArea tiles = 14
+- Original attempt used 4 colors
+- Original attempt did not use Purple
+- Original attempt exceeded `MaxSearchNodes = 200000` during deterministic solvability validation
+- Observed error:
+
+```text
+[SOLVABILITY_VALIDATION][GameManager.StartRun] FAILED
+Solvability search exceeded MaxSearchNodes=200000.
+This level may be too complex for deterministic validation.
+```
+
+Fix record：
+
+- `Level_003` was simplified to Pattern non-None cells = 36
+- `Level_003` was simplified to SelectionArea tiles = 12
+- The fix was data-only
+- Validation was not weakened
+- `MaxSearchNodes` was not increased
+- `DeterministicSolvabilityValidator` was not bypassed
+
+Scope warning：
+
+- `Level_003` is a small safe prototype.
+- `Level_003` is not a large-level support milestone.
+- `Level_003` is not procedural generation.
+- `Level_003` is not multi-level progression.
+- `Level_003` is not the new large-level baseline.
+- `Level_003` does not prove production-ready scaling.
 
 ---
 
@@ -303,7 +401,9 @@ Temporary safe prototype limits remain active:
 - Do not exceed Pattern non-None cells <= 45.
 - Do not exceed SelectionArea tiles <= 15.
 - Large-level support is still not production-ready.
-- Resolve-chain budget, log throttling, and performance caps still need further testing before scaling up.
+- Resolve-chain budget, log throttling, deterministic validation search budget, and performance caps still need further testing before scaling up.
+- Random-looking mixed layouts can still explode deterministic solvability search complexity.
+- For now, level growth must remain gradual and validation-budget-friendly.
 
 尚未 production-ready：
 
@@ -318,6 +418,7 @@ Temporary safe prototype limits remain active:
 - next-level flow 未声明完成。
 - multi-level progression 未声明完成。
 - `Level_002` 已由用户验证为 small safe expansion prototype，但不是 large-level support milestone。
+- `Level_003` 已由用户验证为第二个 small safe expansion prototype，但不是 large-level support milestone。
 
 ---
 
@@ -342,6 +443,6 @@ Temporary safe prototype limits remain active:
 - 在 Editor Validation 未通过时提交新关卡或编辑后的关卡
 - 在 Play test 未到达 WIN 时提交新关卡或编辑后的关卡
 - 在 Console red errors 不为 0 时提交新关卡或编辑后的关卡
-- 将 `Level_002` 描述为 large-level support milestone 或新的 large-level baseline
+- 将 `Level_002` 或 `Level_003` 描述为 large-level support milestone 或新的 large-level baseline
 - 声称 multi-level progression 存在
 - 声称 procedural generation 存在
