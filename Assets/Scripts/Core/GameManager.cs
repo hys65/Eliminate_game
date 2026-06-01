@@ -338,6 +338,16 @@ namespace EliminateGame.Core
                    && tempZoneController.Slots[slotIndex].Color == color;
         }
 
+        private int CalculateRuntimeInvariantSafeRemoveCount(int bottomRowCount, int remainingProgress)
+        {
+            if (bottomRowCount <= 0 || remainingProgress <= 0)
+            {
+                return 0;
+            }
+
+            return Mathf.Min(bottomRowCount, remainingProgress);
+        }
+
         private int FindFirstSlotIndexByColor(BlockColor color)
         {
             for (int i = 0; i < tempZoneController.Slots.Count; i++)
@@ -414,9 +424,7 @@ namespace EliminateGame.Core
             int tempSlotCountBefore = tempZoneController.Count;
             int targetSlotProgress = slotProgressBefore;
             int remainingProgress = Mathf.Clamp(3 - targetSlotProgress, 0, 3);
-            int removeCount = bottomRowCount < 3
-                ? bottomRowCount
-                : Mathf.Min(bottomRowCount, remainingProgress);
+            int removeCount = CalculateRuntimeInvariantSafeRemoveCount(bottomRowCount, remainingProgress);
             string patternCountsBefore = FormatColorCounts(patternController.GetNonNoneColorCounts());
             string tempSlotsBefore = FormatTempSlots();
 
@@ -474,10 +482,29 @@ namespace EliminateGame.Core
 
             if (!isValid)
             {
-                Debug.LogError("Runtime invariant validation failed.");
+                Debug.LogError(BuildRuntimeInvariantFailureReport(context));
             }
 
             return isValid;
+        }
+
+        private string BuildRuntimeInvariantFailureReport(string context)
+        {
+            string activeConfigName = activeGameConfig != null ? activeGameConfig.name : "<null>";
+            string configuredGameConfigName = gameConfig != null ? gameConfig.name : "<null>";
+            bool levelDatabaseAssigned = levelDatabase != null;
+
+            return
+                "[RUNTIME_INVARIANT][GameManager] Runtime invariant validation failed." +
+                $" Context={context}" +
+                $" ActiveGameConfig={activeConfigName}" +
+                $" ConfiguredGameConfig={configuredGameConfigName}" +
+                $" CurrentLevelIndex={currentLevelIndex}" +
+                $" LevelDatabaseAssigned={levelDatabaseAssigned}" +
+                $" PatternCounts={FormatColorCounts(patternController.GetNonNoneColorCounts())}" +
+                $" SelectionRemainingCounts={FormatSelectionRemainingCounts()}" +
+                $" TempSlots={FormatTempSlots()}" +
+                $" InvariantDetails={BuildRemainingInvariantReport()}";
         }
 
         private string FormatColorCounts(Dictionary<BlockColor, int> counts)
