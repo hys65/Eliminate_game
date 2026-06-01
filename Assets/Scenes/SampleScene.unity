@@ -198,14 +198,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 10b8a9a41cd7eda49a9b4799e81d26b2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EliminateGame.Core.GameManager
-  gameConfig: {fileID: 11400000, guid: 32c3fba83a55485498ce357bd286ba9d, type: 2}
+  gameConfig: {fileID: 11400000, guid: 6d1dbcf25f85f4b688e07dedec930d43, type: 2}
   levelDatabase: {fileID: 0}
   currentLevelIndex: 0
   patternController: {fileID: 654914619}
   tempZoneController: {fileID: 535113916}
   selectionAreaGridController: {fileID: 890418635}
   autoResolveSafetyLimit: 128
+  muteUnityInfoLogsDuringAutoResolve: 1
   rescueRandomSeed: 12345
+  resolveDebugLogsEnabled: 0
+  resolveDebugLogLimitPerClick: 12
 --- !u!1 &519420028
 GameObject:
   m_ObjectHideFlags: 0
