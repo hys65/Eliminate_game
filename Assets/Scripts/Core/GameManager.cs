@@ -86,6 +86,26 @@ namespace EliminateGame.Core
                 return;
             }
 
+            InitializeRunFromConfig(activeConfig, "StartRun");
+
+            Debug.Log("Game run started.");
+        }
+
+        private void RestartRunFast()
+        {
+            if (activeGameConfig == null)
+            {
+                StartRun();
+                return;
+            }
+
+            InitializeRunFromConfig(activeGameConfig, "RestartRunFast");
+
+            Debug.Log("Game run restarted.");
+        }
+
+        private void InitializeRunFromConfig(GameConfig activeConfig, string context)
+        {
             rescueUses = 0;
             State = GameState.Running;
             isMenuOpen = false;
@@ -101,9 +121,8 @@ namespace EliminateGame.Core
             selectionAreaGridController.Initialize(activeConfig);
             selectionAreaGridController.TileSelected += OnSelectionAreaTileSelected;
 
-            Debug.Log("Game run started.");
-            AssertGameRuntimeSafety("StartRun");
-            ValidateRuntimeInvariant("StartRun.End");
+            AssertGameRuntimeSafety(context);
+            ValidateRuntimeInvariant($"{context}.End");
             EvaluateStateAfterAction();
         }
 
@@ -617,7 +636,7 @@ namespace EliminateGame.Core
                     if (GUI.Button(restartMenuRect, "Restart"))
                     {
                         isMenuOpen = false;
-                        StartRun();
+                        RestartRunFast();
                     }
                 }
             }
@@ -663,7 +682,7 @@ namespace EliminateGame.Core
 
             if (GUI.Button(buttonRect, "Restart", restartButtonStyle))
             {
-                StartRun();
+                RestartRunFast();
             }
         }
     }
