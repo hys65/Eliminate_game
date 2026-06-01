@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::EliminateGame.Visual.LargePatternVisualConfig
   width: 30
   height: 28
-  cellSize: 0.18
+  cellSize: 0.22
   cells:
   - 5
   - 5
