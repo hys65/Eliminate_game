@@ -205,7 +205,91 @@ Temporary scaling warnings remain active:
 - Do not exceed Pattern non-None cells <= 45.
 - Do not exceed SelectionArea tiles <= 15.
 - Large-level support is still not production-ready.
-- Resolve-chain budget, log throttling, and performance caps still need further testing before scaling up.
+- Resolve-chain budget, log throttling, deterministic validation search budget, and performance caps still need further testing before scaling up.
+- Random-looking mixed layouts can still explode deterministic solvability search complexity.
+- For now, level growth must remain gradual and validation-budget-friendly.
+
+---
+
+# J. Level_003 Verified Small Safe Prototype（完成）
+
+Current verified second small expansion prototype asset:
+
+```text
+Assets/GameConfigs/Levels/Level_003_GameConfig.asset
+```
+
+Verified by user after the simplified 36 / 12 fix:
+
+- [x] `Level_003_GameConfig` exists under `Assets/GameConfigs/Levels/`
+- [x] Editor Validation = PASS
+- [x] Play Mode result = WIN
+- [x] Play Mode initializes visible gameplay content
+- [x] MaxSearchNodes error no longer appears
+- [x] Menu -> Restart = normal
+- [x] Restart after Menu shows gameplay content again
+- [x] Console red errors = 0
+- [x] `Level_003` is data-only authored `GameConfig` content
+- [x] `Level_003` is the second verified small expansion prototype after `Level_002`
+
+Current Level_003 verified design:
+
+- Pattern non-None cells = 36
+- SelectionArea tiles = 12
+- Pattern dimensions = 6 rows x 6 columns
+- SelectionArea dimensions = 4 columns x 3 rows
+- 4 colors only
+- Purple is not used
+- Red remains dominant or tied-dominant
+- Pattern is visually mixed
+- Pattern is no longer 14x3
+- Pattern is no longer uniform same-color rows
+- Pattern fits screen better than the rejected 14x3 version
+- Pattern Red = 12, Blue = 9, Green = 9, Yellow = 6, Purple = 0
+- SelectionArea Red = 4, Blue = 3, Green = 3, Yellow = 2, Purple = 0
+- `PatternCount[color] = SelectionAreaCount[color] * 3` holds for all colors
+
+Rejected Level_003 history:
+
+- Rejected attempt used Pattern non-None cells = 42
+- Rejected attempt used SelectionArea tiles = 14
+- Rejected attempt used 4 colors and no Purple
+- Rejected attempt exceeded `MaxSearchNodes = 200000` during deterministic solvability validation
+- Observed error:
+
+```text
+[SOLVABILITY_VALIDATION][GameManager.StartRun] FAILED
+Solvability search exceeded MaxSearchNodes=200000.
+This level may be too complex for deterministic validation.
+```
+
+Fix record:
+
+- `Level_003` was simplified to Pattern non-None cells = 36
+- `Level_003` was simplified to SelectionArea tiles = 12
+- The fix was data-only
+- Validation was not weakened
+- `MaxSearchNodes` was not increased
+- `DeterministicSolvabilityValidator` was not bypassed
+
+Scope:
+
+- `Level_003` is a small safe prototype.
+- `Level_003` is not a large-level support milestone.
+- `Level_003` is not the new large-level baseline.
+- `Level_003` is not procedural generation.
+- `Level_003` is not multi-level progression.
+- `Level_003` does not prove production-ready scaling.
+
+Temporary scaling warnings remain active:
+
+- Do not create oversized levels yet.
+- Do not exceed Pattern non-None cells <= 45.
+- Do not exceed SelectionArea tiles <= 15.
+- Large-level support is still not production-ready.
+- Resolve-chain budget, log throttling, deterministic validation search budget, and performance caps still need further testing before scaling up.
+- Random-looking mixed layouts can still explode deterministic solvability search complexity.
+- For now, level growth must remain gradual and validation-budget-friendly.
 
 ---
 
@@ -220,6 +304,7 @@ System Stabilization and Level Authoring Documentation
 - progress-driven semantics lock
 - Level_001 stable baseline is recorded
 - Level_002 first verified small expansion prototype is recorded
+- Level_003 second verified small expansion prototype is recorded
 - level production must follow `docs/level_authoring_guide.md`
 - Editor Validation must pass before committing new levels
 - Play Mode test must reach WIN before committing new levels
@@ -261,6 +346,7 @@ These items are not implemented and must not be described as existing gameplay f
 ## Content
 
 - [x] first verified small expansion prototype: `Level_002_GameConfig`
+- [x] second verified small expansion prototype: `Level_003_GameConfig`
 - [ ] additional verified level assets
 - [ ] additional patterns
 - [ ] difficulty curves

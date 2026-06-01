@@ -39,6 +39,8 @@ Use `Level_001_GameConfig` as the known stable baseline when starting new level 
 
 `Level_002_GameConfig` exists and has been verified by the user as the first small safe expansion prototype. It is documented as data-only authored `GameConfig` content, not as a large-level support milestone and not as the new large-level baseline.
 
+`Level_003_GameConfig` exists and has been verified by the user as the second small safe expansion prototype after the simplified 36 Pattern / 12 Selection fix. It is documented as data-only authored `GameConfig` content, not as a large-level support milestone, not as the new large-level baseline, and not as proof of production-ready scaling.
+
 Do not claim another level asset exists until that asset is actually created, validated, Play tested to WIN, and recorded.
 
 ---
@@ -118,6 +120,93 @@ Scope rules for Level_002:
 - `Level_002` is not a large-level support milestone.
 - `Level_002` is not procedural generation.
 - `Level_002` is not multi-level progression.
+
+---
+
+## 2.2 Verified small expansion prototype: Level_003
+
+Verified small safe prototype asset:
+
+```text
+Assets/GameConfigs/Levels/Level_003_GameConfig.asset
+```
+
+User-verified status after the simplified 36 / 12 fix:
+
+- `Level_003_GameConfig` exists.
+- Editor Validation = PASS.
+- Play Mode result = WIN.
+- Play Mode initializes visible gameplay content.
+- MaxSearchNodes error no longer appears.
+- Menu -> Restart = normal.
+- Restart after Menu shows gameplay content again.
+- Console red errors = 0.
+- `Level_003` is data-only authored `GameConfig` content.
+- `Level_003` is the second verified small expansion prototype after `Level_002`.
+
+Current Level_003 verified design:
+
+- Pattern non-None cells = 36.
+- SelectionArea tiles = 12.
+- Pattern dimensions = 6 rows x 6 columns.
+- SelectionArea dimensions = 4 columns x 3 rows.
+- 4 colors only.
+- Purple is not used.
+- Red remains dominant or tied-dominant.
+- Pattern is visually mixed.
+- Pattern is no longer 14x3.
+- Pattern is no longer uniform same-color rows.
+- Pattern fits screen better than the rejected 14x3 version.
+
+Color counts:
+
+| Area | Red | Blue | Green | Yellow | Purple |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Pattern | 12 | 9 | 9 | 6 | 0 |
+| SelectionArea | 4 | 3 | 3 | 2 | 0 |
+
+Invariant status:
+
+```text
+PatternCount[color] = SelectionAreaCount[color] * 3
+```
+
+This holds for all colors in `Level_003`.
+
+Rejected Level_003 history:
+
+- Original attempt used Pattern non-None cells = 42.
+- Original attempt used SelectionArea tiles = 14.
+- Original attempt used 4 colors.
+- Original attempt did not use Purple.
+- Original attempt exceeded `MaxSearchNodes = 200000` during deterministic solvability validation.
+- Observed error:
+
+```text
+[SOLVABILITY_VALIDATION][GameManager.StartRun] FAILED
+Solvability search exceeded MaxSearchNodes=200000.
+This level may be too complex for deterministic validation.
+```
+
+Fix record:
+
+- `Level_003` was simplified to Pattern non-None cells = 36.
+- `Level_003` was simplified to SelectionArea tiles = 12.
+- The fix was data-only.
+- Validation was not weakened.
+- `MaxSearchNodes` was not increased.
+- `DeterministicSolvabilityValidator` was not bypassed.
+
+Scope rules for Level_003:
+
+- `Level_003` is a small safe prototype.
+- `Level_003` is data-only authored `GameConfig` content.
+- `Level_003` is the second verified small expansion prototype.
+- `Level_003` is not the new large-level baseline.
+- `Level_003` is not a large-level support milestone.
+- `Level_003` is not procedural generation.
+- `Level_003` is not multi-level progression.
+- `Level_003` does not prove production-ready scaling.
 
 ---
 
@@ -374,6 +463,12 @@ First verified small expansion prototype:
 Assets/GameConfigs/Levels/Level_002_GameConfig.asset
 ```
 
+Second verified small expansion prototype:
+
+```text
+Assets/GameConfigs/Levels/Level_003_GameConfig.asset
+```
+
 Use this naming format for future level assets only after they are actually created:
 
 ```text
@@ -392,7 +487,8 @@ Rules:
 - Keep the `Level_` prefix.
 - Keep the `_GameConfig.asset` suffix.
 - Do not use ambiguous names such as `NewGameConfig.asset`, `Test.asset`, or `Final.asset` for committed level content.
-- `Level_002_GameConfig.asset` exists and has been verified by the user as a small safe prototype.
+- `Level_002_GameConfig.asset` exists and has been verified by the user as the first small safe prototype.
+- `Level_003_GameConfig.asset` exists and has been verified by the user as the second small safe prototype.
 - Do not claim any later level asset exists unless that file has actually been created and verified.
 
 ---
@@ -419,8 +515,9 @@ Do not do any of the following while authoring levels:
 - Do not create oversized levels yet.
 - Do not exceed Pattern non-None cells <= 45.
 - Do not exceed SelectionArea tiles <= 15.
-- Do not claim `Level_002` is large-level support or a new large-level baseline.
+- Do not claim `Level_002` or `Level_003` is large-level support or a new large-level baseline.
+- Do not claim `Level_003` proves production-ready scaling.
 - Do not claim multi-level progression exists.
 - Do not claim procedural generation exists.
 
-The level must fit the stable rules. The stable rules must not be changed to fit the level. Large-level support is still not production-ready. Resolve-chain budget, log throttling, and performance caps still need further testing before scaling up.
+The level must fit the stable rules. The stable rules must not be changed to fit the level. Large-level support is still not production-ready. Resolve-chain budget, log throttling, deterministic validation search budget, and performance caps still need further testing before scaling up. Random-looking mixed layouts can still explode deterministic solvability search complexity. For now, level growth must remain gradual and validation-budget-friendly.
