@@ -7,6 +7,13 @@ GameManager
  ├── TempZoneController
  └── PatternController
 
+Visual-only layer:
+ LargePatternVisualController
+   ↑
+ visual binder
+   ↑
+ PatternController removed-cell event
+
 ---
 
 # 三层结构
@@ -31,6 +38,13 @@ Selection click
 → collapse
 → auto resolve chain（same progress-driven rule）
 → win/lose check
+
+Visual-only sync side route:
+
+Gameplay Pattern cell removed
+→ PatternController emits removed-cell event
+→ visual binder maps removed gameplay cell to a region of 30x28 visual pixels
+→ LargePatternVisualController hides those visual pixels
 
 ---
 
@@ -79,6 +93,66 @@ Selection click
 - column gravity only
 - no cross-column movement
 - logical state 是 runtime source of truth
+
+---
+
+## LargePatternVisual（Verified visual-only prototype）
+
+Milestone:
+
+```text
+LargePatternVisual Gameplay Sync Prototype
+```
+
+Status:
+
+```text
+Verified
+```
+
+职责：
+- visual-only 30x28 large pixel wall
+- receive one-way sync from gameplay Pattern removal events
+- hide mapped visual pixels when gameplay Pattern cells are removed
+- fully hide remaining visual pixels on WIN
+- fully restore visual pixels on Restart
+
+规则：
+- 30x28 LargePatternVisual is not gameplay logic.
+- Runtime source of truth remains GameConfig gameplay Pattern, TempZone, and SelectionArea.
+- 30x28 LargePatternVisual does not participate in DeterministicSolvabilityValidator.
+- 30x28 LargePatternVisual does not participate in RuntimeInvariantValidator.
+- 30x28 LargePatternVisual does not participate in PatternCount.
+- 30x28 LargePatternVisual does not participate in SelectionArea count.
+- 30x28 LargePatternVisual does not participate in TempZone debt.
+- 30x28 LargePatternVisual does not decide WIN / LOSE.
+
+Stable coordinate mapping:
+- Current row / column mapping is not stable because Pattern uses bottom-row resolve, column gravity, and collapse.
+- PatternCell stores stable original identity: `OriginalRow` and `OriginalColumn`.
+- PatternRemovedCell exposes `OriginalRow`, `OriginalColumn`, `CurrentRow`, `CurrentColumn`, and `Color`.
+- The visual binder maps LargePatternVisual regions using `OriginalRow` and `OriginalColumn`.
+- Ghost effects and current-position visuals use `CurrentRow` and `CurrentColumn`.
+
+Verified results:
+- Console red errors = 0.
+- SelectionArea clicks hide regions of the 30x28 LargePatternVisual.
+- Original gameplay Pattern resolves normally.
+- Level reaches WIN.
+- WIN fully hides the LargePatternVisual.
+- Menu -> Restart works.
+- Restart fully restores the LargePatternVisual.
+- RuntimeInvariantValidator remains active and clean.
+- DeterministicSolvabilityValidator was not modified.
+- MaxSearchNodes was not increased and is not triggered.
+
+Scaling warnings:
+- Do not make 30x28 visual pixels into gameplay cells.
+- Do not add 840 cells into GameConfig Pattern.
+- Do not bypass deterministic validation.
+- Do not disable RuntimeInvariantValidator.
+- Do not increase MaxSearchNodes as a workaround.
+- Large-level gameplay support is still not production-ready.
 
 ---
 

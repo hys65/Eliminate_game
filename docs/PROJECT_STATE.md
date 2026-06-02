@@ -13,6 +13,8 @@
 
 `Level_003_GameConfig` 是用户已验证的第二个 small safe expansion prototype。它不是新的 large-level baseline，不是 large-level support milestone，也不证明 production-ready scaling。
 
+`LargePatternVisual Gameplay Sync Prototype` 是用户已验证的 visual-only 30x28 large pixel wall milestone。它由 small gameplay Pattern removals 驱动，不是 30x28 gameplay Pattern，不支持 840 gameplay cells，也不证明 production-ready large-level gameplay support。
+
 当前稳定 baseline asset 位置：
 
 ```text
@@ -258,6 +260,7 @@ removeCount =
 - count consistency 已验证
 - deterministic solvability validation 已接入 GameManager.StartRun()
 - RuntimeInvariantValidator remains active during valid gameplay
+- LargePatternVisual Gameplay Sync Prototype is verified as visual-only gameplay sync
 
 ---
 
@@ -393,6 +396,87 @@ Level_001 verified run reaches WIN.
 
 ---
 
+
+# LargePatternVisual Gameplay Sync Prototype（Verified）
+
+Milestone name:
+
+```text
+LargePatternVisual Gameplay Sync Prototype
+```
+
+User-verified status:
+
+- Console red errors = 0.
+- Clicking SelectionArea tiles causes regions of the 30x28 LargePatternVisual to disappear.
+- Original gameplay Pattern still resolves normally.
+- Level reaches WIN.
+- On WIN, the LargePatternVisual fully disappears.
+- Menu -> Restart works.
+- Restart restores the LargePatternVisual fully.
+- RuntimeInvariantValidator remains active and clean.
+- RuntimeInvariantValidator no longer reports errors.
+- MaxSearchNodes is not triggered.
+
+Verified architecture:
+
+- LargePatternVisual is a visual-only layer driven by gameplay Pattern events.
+- The 30x28 visual wall is not gameplay logic.
+- GameConfig gameplay Pattern remains the runtime source of truth with TempZone and SelectionArea.
+- The 30x28 LargePatternVisual does not participate in DeterministicSolvabilityValidator.
+- The 30x28 LargePatternVisual does not participate in RuntimeInvariantValidator.
+- The 30x28 LargePatternVisual does not participate in PatternCount.
+- The 30x28 LargePatternVisual does not participate in SelectionArea count.
+- The 30x28 LargePatternVisual does not participate in TempZone debt.
+- The 30x28 LargePatternVisual does not decide WIN / LOSE.
+- DeterministicSolvabilityValidator was not modified.
+- MaxSearchNodes was not increased.
+
+Visual sync route:
+
+```text
+Gameplay Pattern cell removed
+→ PatternController emits removed-cell event
+→ visual binder maps removed gameplay cell to a region of 30x28 visual pixels
+→ LargePatternVisualController hides those visual pixels
+```
+
+Stable coordinate mapping:
+
+- The first visual-sync attempt used current row / column mapping.
+- Current row / column mapping was unstable because Pattern uses bottom-row resolve, column gravity, and collapse.
+- Final verified mapping uses `OriginalRow` and `OriginalColumn`.
+- `PatternCell` stores `OriginalRow` and `OriginalColumn`.
+- `PatternRemovedCell` exposes `OriginalRow`, `OriginalColumn`, `CurrentRow`, `CurrentColumn`, and `Color`.
+- The visual binder maps LargePatternVisual regions using `OriginalRow` and `OriginalColumn`.
+- Ghost effects and current-position visuals use `CurrentRow` and `CurrentColumn`.
+
+Verified outcomes from original-coordinate mapping:
+
+- Visual regions are not repeatedly mapped to the same runtime position.
+- WIN fully clears the LargePatternVisual.
+- Restart fully restores the LargePatternVisual.
+
+Scaling warnings remain active:
+
+- Do not make 30x28 visual pixels into gameplay cells.
+- Do not add 840 cells into GameConfig Pattern.
+- Do not bypass deterministic validation.
+- Do not disable RuntimeInvariantValidator.
+- Do not increase MaxSearchNodes as a workaround.
+- Large-level gameplay support is still not production-ready.
+
+Do not claim:
+
+- 30x28 gameplay Pattern exists.
+- 840 gameplay cells are supported.
+- Large-level solver support exists.
+- Procedural generation exists.
+- Multi-level progression exists.
+- Production-ready large-level support exists.
+
+---
+
 # 当前已知限制
 
 Temporary safe prototype limits remain active:
@@ -444,5 +528,7 @@ Temporary safe prototype limits remain active:
 - 在 Play test 未到达 WIN 时提交新关卡或编辑后的关卡
 - 在 Console red errors 不为 0 时提交新关卡或编辑后的关卡
 - 将 `Level_002` 或 `Level_003` 描述为 large-level support milestone 或新的 large-level baseline
+- 将 30x28 LargePatternVisual 描述为 gameplay Pattern 或 840 gameplay cells support
+- 为了 LargePatternVisual 绕过 deterministic validation、关闭 RuntimeInvariantValidator、或提高 MaxSearchNodes
 - 声称 multi-level progression 存在
 - 声称 procedural generation 存在
