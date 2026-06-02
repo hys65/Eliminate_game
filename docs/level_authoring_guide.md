@@ -41,6 +41,8 @@ Use `Level_001_GameConfig` as the known stable baseline when starting new level 
 
 `Level_003_GameConfig` exists and has been verified by the user as the second small safe expansion prototype after the simplified 36 Pattern / 12 Selection fix. It is documented as data-only authored `GameConfig` content, not as a large-level support milestone, not as the new large-level baseline, and not as proof of production-ready scaling.
 
+`LargePatternVisual Gameplay Sync Prototype` has been verified by the user as a visual-only 30x28 large pixel wall driven by small gameplay Pattern removals. It is not a level asset, not a 30x28 gameplay Pattern, not 840 gameplay cells support, not large-level solver support, and not production-ready large-level gameplay support.
+
 Do not claim another level asset exists until that asset is actually created, validated, Play tested to WIN, and recorded.
 
 ---
@@ -210,7 +212,89 @@ Scope rules for Level_003:
 
 ---
 
-## 3. Three-layer structure
+## 3. LargePatternVisual Gameplay Sync Prototype
+
+Milestone name:
+
+```text
+LargePatternVisual Gameplay Sync Prototype
+```
+
+Status:
+
+```text
+Verified
+```
+
+User-verified result:
+
+- Console red errors = 0.
+- Clicking SelectionArea tiles causes regions of the 30x28 LargePatternVisual to disappear.
+- Original gameplay Pattern still resolves normally.
+- Level reaches WIN.
+- On WIN, the LargePatternVisual fully disappears.
+- Menu -> Restart works.
+- Restart restores the LargePatternVisual fully.
+- RuntimeInvariantValidator remains active and clean.
+- RuntimeInvariantValidator no longer reports errors.
+- MaxSearchNodes is not triggered.
+
+Authoring meaning:
+
+- The 30x28 LargePatternVisual is a visual-only wall.
+- It is driven by the small gameplay Pattern.
+- It must not be authored as GameConfig gameplay Pattern cells.
+- It must not be counted as PatternCount.
+- It must not be counted as SelectionArea tiles.
+- It must not be counted as TempZone debt.
+- It must not decide WIN / LOSE.
+
+Runtime source of truth remains:
+
+```text
+GameConfig gameplay Pattern
+TempZone
+SelectionArea
+```
+
+The visual-only sync route is:
+
+```text
+Gameplay Pattern cell removed
+→ PatternController emits removed-cell event
+→ visual binder maps removed gameplay cell to a region of 30x28 visual pixels
+→ LargePatternVisualController hides those visual pixels
+```
+
+Stable original-coordinate mapping:
+
+- Current row / column is not stable for visual-region mapping because Pattern uses bottom-row resolve, column gravity, and collapse.
+- `PatternCell` stores stable `OriginalRow` and `OriginalColumn`.
+- `PatternRemovedCell` exposes `OriginalRow`, `OriginalColumn`, `CurrentRow`, `CurrentColumn`, and `Color`.
+- The visual binder maps LargePatternVisual regions using `OriginalRow` and `OriginalColumn`.
+- Ghost effects and current-position visuals use `CurrentRow` and `CurrentColumn`.
+
+Verification consequences:
+
+- Visual regions are not repeatedly mapped to the same runtime position.
+- WIN hides all remaining LargePatternVisual pixels.
+- Restart restores all LargePatternVisual pixels.
+- RuntimeInvariantValidator remains active and clean.
+- DeterministicSolvabilityValidator was not modified.
+- MaxSearchNodes was not increased.
+
+Scaling warnings:
+
+- Do not make 30x28 visual pixels into gameplay cells.
+- Do not add 840 cells into GameConfig Pattern.
+- Do not bypass deterministic validation.
+- Do not disable RuntimeInvariantValidator.
+- Do not increase MaxSearchNodes as a workaround.
+- Large-level gameplay support is still not production-ready.
+
+---
+
+## 4. Three-layer structure
 
 Every authored level must respect the current three-layer gameplay structure.
 
@@ -260,7 +344,7 @@ The player clicks available SelectionArea tiles. Those tiles enter TempZone and 
 
 ---
 
-## 4. Final resolve rule
+## 5. Final resolve rule
 
 The current stable resolve rule is progress-driven.
 
@@ -307,7 +391,7 @@ Do not replace this formula with another rule while authoring levels.
 
 ---
 
-## 5. Required invariant
+## 6. Required invariant
 
 Every authored level must preserve the runtime invariant for each color.
 
@@ -346,7 +430,7 @@ This count rule is necessary, but not sufficient. The level must also be playabl
 
 ---
 
-## 6. SelectionArea authoring rules
+## 7. SelectionArea authoring rules
 
 SelectionArea is the only input source.
 
@@ -374,7 +458,7 @@ A level can have correct total color counts and still fail if the required color
 
 ---
 
-## 7. Pattern authoring rules
+## 8. Pattern authoring rules
 
 Pattern is bottom-row driven.
 
@@ -394,7 +478,7 @@ After a resolve removes Pattern cells, remaining cells fall within their origina
 
 ---
 
-## 8. Editor Validation workflow
+## 9. Editor Validation workflow
 
 Run validation every time any `GameConfig` is edited.
 
@@ -421,7 +505,7 @@ Validation is read-only. It reports invalid authored data; it does not rewrite t
 
 ---
 
-## 9. Play test workflow
+## 10. Play test workflow
 
 After Editor Validation passes:
 
@@ -443,7 +527,7 @@ Only commit after Editor Validation passes, Play Mode reaches WIN, and Console r
 
 ---
 
-## 10. Level asset naming convention
+## 11. Level asset naming convention
 
 Store authored level configs under:
 
@@ -493,7 +577,7 @@ Rules:
 
 ---
 
-## 11. Hard restrictions
+## 12. Hard restrictions
 
 Level authoring must stay data-only unless a separate engineering task explicitly changes gameplay rules.
 
@@ -506,6 +590,13 @@ Do not do any of the following while authoring levels:
 - Do not commit a level that has not been Play tested to WIN.
 - Do not commit a level if Console red errors are greater than 0.
 - Do not disable or bypass RuntimeInvariantValidator.
+- Do not make 30x28 visual pixels into gameplay cells.
+- Do not add 840 cells into GameConfig Pattern.
+- Do not make LargePatternVisual participate in DeterministicSolvabilityValidator.
+- Do not make LargePatternVisual participate in RuntimeInvariantValidator.
+- Do not make LargePatternVisual participate in PatternCount, SelectionArea count, or TempZone debt.
+- Do not make LargePatternVisual decide WIN / LOSE.
+- Do not increase MaxSearchNodes as a workaround.
 - Do not change resolve semantics.
 - Do not change SelectionArea unlock semantics.
 - Do not change Pattern gravity semantics.
@@ -517,6 +608,10 @@ Do not do any of the following while authoring levels:
 - Do not exceed SelectionArea tiles <= 15.
 - Do not claim `Level_002` or `Level_003` is large-level support or a new large-level baseline.
 - Do not claim `Level_003` proves production-ready scaling.
+- Do not claim 30x28 gameplay Pattern exists.
+- Do not claim 840 gameplay cells are supported.
+- Do not claim large-level solver support exists.
+- Do not claim production-ready large-level support exists.
 - Do not claim multi-level progression exists.
 - Do not claim procedural generation exists.
 

@@ -293,6 +293,90 @@ Temporary scaling warnings remain active:
 
 ---
 
+
+# K. LargePatternVisual Gameplay Sync Prototype（完成 / Verified）
+
+Milestone name:
+
+```text
+LargePatternVisual Gameplay Sync Prototype
+```
+
+Verified by user:
+
+- [x] Console red errors = 0
+- [x] Clicking SelectionArea tiles causes regions of the 30x28 LargePatternVisual to disappear
+- [x] Original gameplay Pattern still resolves normally
+- [x] Level reaches WIN
+- [x] On WIN, the LargePatternVisual fully disappears
+- [x] Menu -> Restart works
+- [x] Restart restores the LargePatternVisual fully
+- [x] RuntimeInvariantValidator remains active and clean
+- [x] RuntimeInvariantValidator no longer reports errors
+- [x] MaxSearchNodes is not triggered
+
+Scope:
+
+- [x] visual-only 30x28 large pixel wall
+- [x] driven by small gameplay Pattern removals
+- [x] does not increase solver complexity
+- [x] does not modify gameplay semantics
+- [x] does not increase MaxSearchNodes
+- [x] keeps RuntimeInvariantValidator active
+
+Runtime source of truth remains:
+
+```text
+GameConfig gameplay Pattern
+TempZone
+SelectionArea
+```
+
+Visual sync route:
+
+```text
+Gameplay Pattern cell removed
+→ PatternController emits removed-cell event
+→ visual binder maps removed gameplay cell to a region of 30x28 visual pixels
+→ LargePatternVisualController hides those visual pixels
+```
+
+Stable coordinate mapping:
+
+- [x] `PatternCell` stores stable `OriginalRow` and `OriginalColumn`
+- [x] `PatternRemovedCell` exposes `OriginalRow`, `OriginalColumn`, `CurrentRow`, `CurrentColumn`, and `Color`
+- [x] visual binder maps LargePatternVisual regions using `OriginalRow` and `OriginalColumn`
+- [x] ghost effects and current-position visuals use `CurrentRow` and `CurrentColumn`
+
+Reason for original-coordinate mapping:
+
+- The first visual-sync attempt used current row / column mapping.
+- Current row / column changes over time because Pattern uses bottom-row resolve, column gravity, and collapse.
+- Original coordinates prevent visual regions from repeatedly mapping to the same runtime position.
+- Original coordinates allow WIN to fully clear the LargePatternVisual.
+- Restart restores the LargePatternVisual fully.
+
+Non-gameplay guarantees:
+
+- [x] 30x28 LargePatternVisual does not participate in DeterministicSolvabilityValidator
+- [x] 30x28 LargePatternVisual does not participate in RuntimeInvariantValidator
+- [x] 30x28 LargePatternVisual does not participate in PatternCount
+- [x] 30x28 LargePatternVisual does not participate in SelectionArea count
+- [x] 30x28 LargePatternVisual does not participate in TempZone debt
+- [x] 30x28 LargePatternVisual does not decide WIN / LOSE
+- [x] DeterministicSolvabilityValidator was not modified
+
+Scaling warnings remain active:
+
+- Do not make 30x28 visual pixels into gameplay cells.
+- Do not add 840 cells into GameConfig Pattern.
+- Do not bypass deterministic validation.
+- Do not disable RuntimeInvariantValidator.
+- Do not increase MaxSearchNodes as a workaround.
+- Large-level gameplay support is still not production-ready.
+
+---
+
 # 当前阶段
 
 System Stabilization and Level Authoring Documentation
@@ -310,6 +394,8 @@ System Stabilization and Level Authoring Documentation
 - Play Mode test must reach WIN before committing new levels
 - Console red errors must be 0 before committing new levels
 - RuntimeInvariantValidator remains active
+- LargePatternVisual Gameplay Sync Prototype is documented as verified
+- 30x28 LargePatternVisual remains visual-only and gameplay-sync driven
 
 ---
 
