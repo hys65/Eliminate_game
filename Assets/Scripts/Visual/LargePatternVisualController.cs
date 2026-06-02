@@ -19,6 +19,7 @@ namespace EliminateGame.Visual
 
         private static Sprite cachedSolidSquareSprite;
         private readonly List<SpriteRenderer> visualCells = new List<SpriteRenderer>();
+        private readonly Dictionary<Vector2Int, SpriteRenderer> visualCellLookup = new Dictionary<Vector2Int, SpriteRenderer>();
 
         private void Start()
         {
@@ -72,10 +73,45 @@ namespace EliminateGame.Visual
                     renderer.sortingOrder = sortingOrderBase + ((visualConfig.Height - 1 - y) * visualConfig.Width) + x;
 
                     visualCells.Add(renderer);
+                    visualCellLookup[new Vector2Int(x, y)] = renderer;
                 }
             }
 
             Debug.Log($"[LargePatternVisual] Built visual grid Width={visualConfig.Width} Height={visualConfig.Height} NonNoneCells={nonNoneCellCount}", this);
+        }
+
+
+        public void HideCell(int x, int y)
+        {
+            if (visualCellLookup.TryGetValue(new Vector2Int(x, y), out SpriteRenderer renderer) && renderer != null)
+            {
+                renderer.enabled = false;
+            }
+        }
+
+        public void HideCells(IEnumerable<Vector2Int> coordinates)
+        {
+            if (coordinates == null)
+            {
+                return;
+            }
+
+            foreach (Vector2Int coordinate in coordinates)
+            {
+                HideCell(coordinate.x, coordinate.y);
+            }
+        }
+
+        public void ResetVisualState()
+        {
+            for (int i = 0; i < visualCells.Count; i++)
+            {
+                SpriteRenderer renderer = visualCells[i];
+                if (renderer != null)
+                {
+                    renderer.enabled = true;
+                }
+            }
         }
 
         [ContextMenu("Clear Visual Grid")]
@@ -91,6 +127,7 @@ namespace EliminateGame.Visual
             }
 
             visualCells.Clear();
+            visualCellLookup.Clear();
 
             Transform root = GetTileRoot();
             if (root == null)

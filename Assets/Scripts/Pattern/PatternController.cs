@@ -51,6 +51,8 @@ namespace EliminateGame.Pattern
             public BlockColor color;
         }
 
+        public event Action<SCG.IReadOnlyList<PatternRemovedCell>> CellsRemoved;
+
         public bool IsEmpty => GetBottomRowIndex() < 0;
 
         public void Initialize(SCG.IReadOnlyList<SCG.IReadOnlyList<BlockColor>> rows)
@@ -189,6 +191,7 @@ namespace EliminateGame.Pattern
             SCG.List<RemovedCellInfo> removedCells = CaptureRemovedCells(bottomIndex, bottomRow, removeIndices);
             SetCellsToNone(bottomRow, removeIndices);
             int removedCount = removeIndices.Count;
+            NotifyCellsRemoved(removedCells);
 
             comboCount++;
             CameraShake.Instance?.ShakeWithCombo(comboCount);
@@ -205,6 +208,27 @@ namespace EliminateGame.Pattern
             Debug.Log($"Pattern resolve with limit for {color}. Removed={removedCount} from bottom row (left-to-right).");
             AssertResolvedNonNoneCount(color, nonNoneBeforeResolve - removedCount, removedCount);
             return PatternResolveResult.CaseA(removedCount);
+        }
+
+
+        private void NotifyCellsRemoved(SCG.IReadOnlyList<RemovedCellInfo> removedCells)
+        {
+            if (removedCells == null || removedCells.Count <= 0)
+            {
+                return;
+            }
+
+            SCG.List<PatternRemovedCell> publicRemovedCells = new SCG.List<PatternRemovedCell>(removedCells.Count);
+            for (int i = 0; i < removedCells.Count; i++)
+            {
+                RemovedCellInfo removedCell = removedCells[i];
+                publicRemovedCells.Add(new PatternRemovedCell(
+                    removedCell.row,
+                    removedCell.column,
+                    removedCell.color));
+            }
+
+            CellsRemoved?.Invoke(publicRemovedCells);
         }
 
         private static SCG.List<RemovedCellInfo> CaptureRemovedCells(int rowIndex, SCG.List<PatternCell> row, SCG.List<int> indices)

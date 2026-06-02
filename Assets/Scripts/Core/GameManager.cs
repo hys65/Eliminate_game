@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using EliminateGame.Data;
@@ -40,6 +41,8 @@ namespace EliminateGame.Core
         private int resolveStepSequenceId;
         private int resolveDebugLogsThisClick;
         private bool resolveDebugLogLimitWarningEmitted;
+
+        public event Action RunInitialized;
 
         public GameState State { get; private set; } = GameState.None;
         public int RescueUses => rescueUses;
@@ -124,6 +127,7 @@ namespace EliminateGame.Core
             AssertGameRuntimeSafety(context);
             ValidateRuntimeInvariant($"{context}.End");
             EvaluateStateAfterAction();
+            RunInitialized?.Invoke();
         }
 
 
