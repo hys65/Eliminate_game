@@ -2,15 +2,32 @@ namespace EliminateGame.Pattern
 {
     public readonly struct PatternRemovedCell
     {
-        public readonly int Row;
-        public readonly int Column;
+        public readonly int OriginalRow;
+        public readonly int OriginalColumn;
+        public readonly int CurrentRow;
+        public readonly int CurrentColumn;
         public readonly BlockColor Color;
 
-        public PatternRemovedCell(int row, int column, BlockColor color)
+        public int Row => CurrentRow;
+        public int Column => CurrentColumn;
+
+        public PatternRemovedCell(
+            int originalRow,
+            int originalColumn,
+            int currentRow,
+            int currentColumn,
+            BlockColor color)
         {
-            Row = row;
-            Column = column;
+            OriginalRow = originalRow;
+            OriginalColumn = originalColumn;
+            CurrentRow = currentRow;
+            CurrentColumn = currentColumn;
             Color = color;
+        }
+
+        public PatternRemovedCell(int row, int column, BlockColor color)
+            : this(row, column, row, column, color)
+        {
         }
     }
 }

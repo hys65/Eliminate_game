@@ -56,6 +56,7 @@ namespace EliminateGame.Visual
             if (isSubscribedToGameManager && gameManager != null)
             {
                 gameManager.RunInitialized -= OnRunInitialized;
+                gameManager.RunWon -= OnRunWon;
             }
 
             isSubscribedToPattern = false;
@@ -87,12 +88,18 @@ namespace EliminateGame.Visual
             }
 
             gameManager.RunInitialized += OnRunInitialized;
+            gameManager.RunWon += OnRunWon;
             isSubscribedToGameManager = true;
         }
 
         private void OnRunInitialized()
         {
             largeVisualController?.ResetVisualState();
+        }
+
+        private void OnRunWon()
+        {
+            largeVisualController?.HideAllCells();
         }
 
         private void OnPatternCellsRemoved(IReadOnlyList<PatternRemovedCell> removedCells)
@@ -123,10 +130,13 @@ namespace EliminateGame.Visual
                 return;
             }
 
-            int startX = Mathf.FloorToInt(removedCell.Column * visualWidth / (float)gameplayPatternWidth);
-            int endX = Mathf.FloorToInt((removedCell.Column + 1) * visualWidth / (float)gameplayPatternWidth) - 1;
-            int startY = Mathf.FloorToInt(removedCell.Row * visualHeight / (float)gameplayPatternHeight);
-            int endY = Mathf.FloorToInt((removedCell.Row + 1) * visualHeight / (float)gameplayPatternHeight) - 1;
+            int originalColumn = removedCell.OriginalColumn;
+            int originalRow = removedCell.OriginalRow;
+
+            int startX = Mathf.FloorToInt(originalColumn * visualWidth / (float)gameplayPatternWidth);
+            int endX = Mathf.FloorToInt((originalColumn + 1) * visualWidth / (float)gameplayPatternWidth) - 1;
+            int startY = Mathf.FloorToInt(originalRow * visualHeight / (float)gameplayPatternHeight);
+            int endY = Mathf.FloorToInt((originalRow + 1) * visualHeight / (float)gameplayPatternHeight) - 1;
 
             startX = Mathf.Clamp(startX, 0, visualWidth - 1);
             endX = Mathf.Clamp(endX, 0, visualWidth - 1);
