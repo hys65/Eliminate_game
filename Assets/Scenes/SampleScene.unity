@@ -938,6 +938,7 @@ GameObject:
   m_Component:
   - component: {fileID: 2000000001}
   - component: {fileID: 2000000002}
+  - component: {fileID: 2000000003}
   m_Layer: 0
   m_Name: LargePatternVisualRoot
   m_TagString: Untagged
@@ -978,6 +979,25 @@ MonoBehaviour:
   spacing: 0.01
   sortingOrderBase: 500
   buildOnStart: 1
+--- !u!114 &2000000003
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2000000000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 48a4ab3309d24a77ba535b84ff862671, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::EliminateGame.Visual.PatternToLargeVisualBinder
+  patternController: {fileID: 654914619}
+  largeVisualController: {fileID: 2000000002}
+  gameplayPatternWidth: 6
+  gameplayPatternHeight: 6
+  visualWidth: 30
+  visualHeight: 28
+  bindOnStart: 1
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
