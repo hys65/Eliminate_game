@@ -804,9 +804,9 @@ namespace EliminateGame.Pattern
                     continue;
                 }
 
-                if (cell.column + 1 > maxColumnCount)
+                if (cell.currentColumn + 1 > maxColumnCount)
                 {
-                    maxColumnCount = cell.column + 1;
+                    maxColumnCount = cell.currentColumn + 1;
                 }
             }
 
@@ -815,9 +815,9 @@ namespace EliminateGame.Pattern
             for (int i = 0; i < removedCells.Count; i++)
             {
                 RemovedCellInfo cell = removedCells[i];
-                if (cell.row + 1 > preResolveRowCount)
+                if (cell.currentRow + 1 > preResolveRowCount)
                 {
-                    preResolveRowCount = cell.row + 1;
+                    preResolveRowCount = cell.currentRow + 1;
                 }
             }
 
@@ -831,12 +831,12 @@ namespace EliminateGame.Pattern
                 }
 
                 renderer.gameObject.name = "PatternGhostVisual";
-                float x = (cell.column * tileSpacing) - globalCenterOffset;
-                float y = (preResolveRowCount - 1 - cell.row) * tileSpacing;
+                float x = (cell.currentColumn * tileSpacing) - globalCenterOffset;
+                float y = (preResolveRowCount - 1 - cell.currentRow) * tileSpacing;
                 renderer.transform.localPosition = new Vector3(x, y, 0f);
                 renderer.transform.localRotation = Quaternion.identity;
                 renderer.transform.localScale = GetCompensatedVisualScale(renderer.transform.parent);
-                renderer.sortingOrder = sortingOrderBase + (preResolveRowCount * sortingOrderRowStride) + cell.column;
+                renderer.sortingOrder = sortingOrderBase + (preResolveRowCount * sortingOrderRowStride) + cell.currentColumn;
 
                 StartCoroutine(AnimateGhostCoroutine(renderer, comboAtResolve));
             }
