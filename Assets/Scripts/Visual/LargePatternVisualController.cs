@@ -104,12 +104,22 @@ namespace EliminateGame.Visual
 
         public void ResetVisualState()
         {
+            SetAllVisualCellsEnabled(true);
+        }
+
+        public void HideAllCells()
+        {
+            SetAllVisualCellsEnabled(false);
+        }
+
+        private void SetAllVisualCellsEnabled(bool enabled)
+        {
             for (int i = 0; i < visualCells.Count; i++)
             {
                 SpriteRenderer renderer = visualCells[i];
                 if (renderer != null)
                 {
-                    renderer.enabled = true;
+                    renderer.enabled = enabled;
                 }
             }
         }

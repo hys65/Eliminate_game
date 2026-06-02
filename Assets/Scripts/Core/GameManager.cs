@@ -43,6 +43,7 @@ namespace EliminateGame.Core
         private bool resolveDebugLogLimitWarningEmitted;
 
         public event Action RunInitialized;
+        public event Action RunWon;
 
         public GameState State { get; private set; } = GameState.None;
         public int RescueUses => rescueUses;
@@ -628,6 +629,7 @@ namespace EliminateGame.Core
                 tempZoneController.Clear();
                 Debug.Log("Victory: Entire Pattern is cleared.");
                 ValidateRuntimeInvariant("EvaluateStateAfterAction.End");
+                RunWon?.Invoke();
                 return;
             }
 

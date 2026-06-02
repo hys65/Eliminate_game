@@ -46,8 +46,10 @@ namespace EliminateGame.Pattern
 
         private struct RemovedCellInfo
         {
-            public int row;
-            public int column;
+            public int originalRow;
+            public int originalColumn;
+            public int currentRow;
+            public int currentColumn;
             public BlockColor color;
         }
 
@@ -59,13 +61,14 @@ namespace EliminateGame.Pattern
         {
             patternRows.Clear();
 
-            foreach (SCG.IReadOnlyList<BlockColor> row in rows)
+            for (int rowIndex = 0; rowIndex < rows.Count; rowIndex++)
             {
+                SCG.IReadOnlyList<BlockColor> row = rows[rowIndex];
                 var builtRow = new SCG.List<PatternCell>();
 
-                foreach (BlockColor color in row)
+                for (int columnIndex = 0; columnIndex < row.Count; columnIndex++)
                 {
-                    builtRow.Add(new PatternCell(color));
+                    builtRow.Add(new PatternCell(color: row[columnIndex], originalRow: rowIndex, originalColumn: columnIndex));
                 }
 
                 patternRows.Add(builtRow);
@@ -223,8 +226,10 @@ namespace EliminateGame.Pattern
             {
                 RemovedCellInfo removedCell = removedCells[i];
                 publicRemovedCells.Add(new PatternRemovedCell(
-                    removedCell.row,
-                    removedCell.column,
+                    removedCell.originalRow,
+                    removedCell.originalColumn,
+                    removedCell.currentRow,
+                    removedCell.currentColumn,
                     removedCell.color));
             }
 
@@ -242,7 +247,8 @@ namespace EliminateGame.Pattern
                     continue;
                 }
 
-                BlockColor color = row[columnIndex].Color;
+                PatternCell cell = row[columnIndex];
+                BlockColor color = cell.Color;
                 if (color == BlockColor.None)
                 {
                     continue;
@@ -250,8 +256,10 @@ namespace EliminateGame.Pattern
 
                 removedCells.Add(new RemovedCellInfo
                 {
-                    row = rowIndex,
-                    column = columnIndex,
+                    originalRow = cell.OriginalRow,
+                    originalColumn = cell.OriginalColumn,
+                    currentRow = rowIndex,
+                    currentColumn = columnIndex,
                     color = color
                 });
             }
@@ -354,8 +362,8 @@ namespace EliminateGame.Pattern
 
                         PatternCell sourceCell = patternRows[sourceRowIndex][colIndex];
                         BlockColor movedColor = sourceCell.Color;
-                        targetCell.Color = movedColor;
-                        sourceCell.Color = BlockColor.None;
+                        patternRows[rowIndex][colIndex] = sourceCell;
+                        patternRows[sourceRowIndex][colIndex] = targetCell;
                         gravityMoves.Add(new GravityMove
                         {
                             column = colIndex,
