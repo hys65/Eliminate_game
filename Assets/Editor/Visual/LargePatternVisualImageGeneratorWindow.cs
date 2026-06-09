@@ -22,7 +22,22 @@ namespace EliminateGame.Editor.Visual
         private const int DefaultMinimumNeighborCount = 1;
         private const string DefaultOutputPath = "Assets/GameConfigs/Visual/LargePatternVisual_30x28_FromImage.asset";
         private const float DefaultEdgeStrengthThreshold = 0.18f;
-        private const OutlineBlockColor DefaultOutlineColor = OutlineBlockColor.Purple;
+        private const bool DefaultSilhouetteFirstMode = true;
+        private const float DefaultForegroundThreshold = 0.16f;
+        private const bool DefaultUseLargestConnectedComponent = true;
+        private const int DefaultMaskClosePasses = 2;
+        private const int DefaultMaskOpenPasses = 1;
+        private const int DefaultInteriorSimplifyPasses = 2;
+        private const int DefaultKeepHoleMinArea = 6;
+        private const int DefaultMaxPaletteColors = 3;
+        private const BlockColorChoice DefaultPreferredFillColor = BlockColorChoice.Purple;
+        private const BlockColorChoice DefaultPreferredAccentColor = BlockColorChoice.Yellow;
+        private const BlockColorChoice DefaultPreferredDetailColor = BlockColorChoice.Green;
+        private const bool DefaultOutlineEnabled = true;
+        private const BlockColorChoice DefaultOutlineColor = BlockColorChoice.Purple;
+        private const int DefaultOutlineThickness = 1;
+        private const bool DefaultApplyInteriorFloodFillBias = true;
+        private const OutlineBlockColor DefaultLegacyOutlineColor = OutlineBlockColor.Purple;
         private const string SuccessLogPrefix = "[LargePatternVisualImageGenerator] Generated visual config:";
 
         private static readonly Color PurpleColor = new Color(0.6f, 0.2f, 0.8f);
@@ -47,9 +62,24 @@ namespace EliminateGame.Editor.Visual
         [SerializeField] private float lightToNoneThreshold = DefaultLightToNoneThreshold;
         [SerializeField] private int noiseCleanupPasses = DefaultNoiseCleanupPasses;
         [SerializeField] private int minimumNeighborCount = DefaultMinimumNeighborCount;
+        [SerializeField] private bool silhouetteFirstMode = DefaultSilhouetteFirstMode;
+        [SerializeField] private float foregroundThreshold = DefaultForegroundThreshold;
+        [SerializeField] private bool useLargestConnectedComponent = DefaultUseLargestConnectedComponent;
+        [SerializeField] private int maskClosePasses = DefaultMaskClosePasses;
+        [SerializeField] private int maskOpenPasses = DefaultMaskOpenPasses;
+        [SerializeField] private int interiorSimplifyPasses = DefaultInteriorSimplifyPasses;
+        [SerializeField] private int keepHoleMinArea = DefaultKeepHoleMinArea;
+        [SerializeField] private int maxPaletteColors = DefaultMaxPaletteColors;
+        [SerializeField] private BlockColorChoice preferredFillColor = DefaultPreferredFillColor;
+        [SerializeField] private BlockColorChoice preferredAccentColor = DefaultPreferredAccentColor;
+        [SerializeField] private BlockColorChoice preferredDetailColor = DefaultPreferredDetailColor;
+        [SerializeField] private bool outlineEnabled = DefaultOutlineEnabled;
+        [SerializeField] private BlockColorChoice silhouetteOutlineColor = DefaultOutlineColor;
+        [SerializeField] private int outlineThickness = DefaultOutlineThickness;
+        [SerializeField] private bool applyInteriorFloodFillBias = DefaultApplyInteriorFloodFillBias;
         [SerializeField] private bool preserveEdges = true;
         [SerializeField] private float edgeStrengthThreshold = DefaultEdgeStrengthThreshold;
-        [SerializeField] private OutlineBlockColor outlineColor = DefaultOutlineColor;
+        [SerializeField] private OutlineBlockColor outlineColor = DefaultLegacyOutlineColor;
         [SerializeField] private bool applyOutlineAfterCleanup = true;
         [SerializeField] private string statusMessage = string.Empty;
         [SerializeField] private MessageType statusType = MessageType.None;
@@ -72,7 +102,7 @@ namespace EliminateGame.Editor.Visual
 
         private void OnGUI()
         {
-            EditorGUILayout.LabelField("Image-to-LargePatternVisualConfig Pipeline 1.2", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField("Image-to-LargePatternVisualConfig Pipeline 2.0", EditorStyles.boldLabel);
             EditorGUILayout.Space();
 
             sourceImage = (Texture2D)EditorGUILayout.ObjectField("Source Image", sourceImage, typeof(Texture2D), false);
@@ -81,32 +111,56 @@ namespace EliminateGame.Editor.Visual
             alphaThreshold = EditorGUILayout.Slider("Alpha Threshold", alphaThreshold, 0f, 1f);
 
             EditorGUILayout.Space();
-            EditorGUILayout.LabelField("Visual Quality Cleanup", EditorStyles.boldLabel);
-            backgroundToNone = EditorGUILayout.Toggle("Background To None", backgroundToNone);
-            using (new EditorGUI.DisabledScope(!backgroundToNone))
+            EditorGUILayout.LabelField("Silhouette First Mode", EditorStyles.boldLabel);
+            silhouetteFirstMode = EditorGUILayout.Toggle("Silhouette First Mode", silhouetteFirstMode);
+            using (new EditorGUI.DisabledScope(!silhouetteFirstMode))
             {
-                backgroundSampleMode = (BackgroundSampleMode)EditorGUILayout.EnumPopup("Background Sample Mode", backgroundSampleMode);
-                backgroundTolerance = EditorGUILayout.Slider("Background Tolerance", backgroundTolerance, 0f, 1f);
+                foregroundThreshold = EditorGUILayout.Slider("Foreground Threshold", foregroundThreshold, 0f, 1f);
+                useLargestConnectedComponent = EditorGUILayout.Toggle("Use Largest Connected Component", useLargestConnectedComponent);
+                maskClosePasses = EditorGUILayout.IntSlider("Mask Close Passes", maskClosePasses, 0, 4);
+                maskOpenPasses = EditorGUILayout.IntSlider("Mask Open Passes", maskOpenPasses, 0, 3);
+                interiorSimplifyPasses = EditorGUILayout.IntSlider("Interior Simplify Passes", interiorSimplifyPasses, 0, 4);
+                keepHoleMinArea = EditorGUILayout.IntSlider("Keep Hole Min Area", keepHoleMinArea, 0, 50);
+                maxPaletteColors = EditorGUILayout.IntSlider("Max Palette Colors", maxPaletteColors, 1, 5);
+                preferredFillColor = (BlockColorChoice)EditorGUILayout.EnumPopup("Preferred Fill Color", preferredFillColor);
+                preferredAccentColor = (BlockColorChoice)EditorGUILayout.EnumPopup("Preferred Accent Color", preferredAccentColor);
+                preferredDetailColor = (BlockColorChoice)EditorGUILayout.EnumPopup("Preferred Detail Color", preferredDetailColor);
+                outlineEnabled = EditorGUILayout.Toggle("Outline Enabled", outlineEnabled);
+                using (new EditorGUI.DisabledScope(!outlineEnabled))
+                {
+                    silhouetteOutlineColor = (BlockColorChoice)EditorGUILayout.EnumPopup("Outline Color", silhouetteOutlineColor);
+                    outlineThickness = EditorGUILayout.IntSlider("Outline Thickness", outlineThickness, 1, 1);
+                }
+                applyInteriorFloodFillBias = EditorGUILayout.Toggle("Apply Interior Flood Fill Bias", applyInteriorFloodFillBias);
             }
-
-            brightnessToNone = EditorGUILayout.Toggle("Brightness To None", brightnessToNone);
-            using (new EditorGUI.DisabledScope(!brightnessToNone))
-            {
-                darkToNoneThreshold = EditorGUILayout.Slider("Dark To None Threshold", darkToNoneThreshold, 0f, 1f);
-                lightToNoneThreshold = EditorGUILayout.Slider("Light To None Threshold", lightToNoneThreshold, 0f, 1f);
-            }
-
-            noiseCleanupPasses = EditorGUILayout.IntSlider("Noise Cleanup Passes", noiseCleanupPasses, 0, 4);
-            minimumNeighborCount = EditorGUILayout.IntSlider("Minimum Neighbor Count", minimumNeighborCount, 1, 4);
 
             EditorGUILayout.Space();
-            EditorGUILayout.LabelField("Silhouette Outline Preservation", EditorStyles.boldLabel);
-            preserveEdges = EditorGUILayout.Toggle("Preserve Edges", preserveEdges);
-            using (new EditorGUI.DisabledScope(!preserveEdges))
+            EditorGUILayout.LabelField("Legacy 1.2 Cleanup", EditorStyles.boldLabel);
+            using (new EditorGUI.DisabledScope(silhouetteFirstMode))
             {
-                edgeStrengthThreshold = EditorGUILayout.Slider("Edge Strength Threshold", edgeStrengthThreshold, 0f, 1f);
-                outlineColor = (OutlineBlockColor)EditorGUILayout.EnumPopup("Outline Color", outlineColor);
-                applyOutlineAfterCleanup = EditorGUILayout.Toggle("Apply Outline After Cleanup", applyOutlineAfterCleanup);
+                backgroundToNone = EditorGUILayout.Toggle("Background To None", backgroundToNone);
+                using (new EditorGUI.DisabledScope(!backgroundToNone || silhouetteFirstMode))
+                {
+                    backgroundSampleMode = (BackgroundSampleMode)EditorGUILayout.EnumPopup("Background Sample Mode", backgroundSampleMode);
+                    backgroundTolerance = EditorGUILayout.Slider("Background Tolerance", backgroundTolerance, 0f, 1f);
+                }
+
+                brightnessToNone = EditorGUILayout.Toggle("Brightness To None", brightnessToNone);
+                using (new EditorGUI.DisabledScope(!brightnessToNone || silhouetteFirstMode))
+                {
+                    darkToNoneThreshold = EditorGUILayout.Slider("Dark To None Threshold", darkToNoneThreshold, 0f, 1f);
+                    lightToNoneThreshold = EditorGUILayout.Slider("Light To None Threshold", lightToNoneThreshold, 0f, 1f);
+                }
+
+                noiseCleanupPasses = EditorGUILayout.IntSlider("Noise Cleanup Passes", noiseCleanupPasses, 0, 4);
+                minimumNeighborCount = EditorGUILayout.IntSlider("Minimum Neighbor Count", minimumNeighborCount, 1, 4);
+                preserveEdges = EditorGUILayout.Toggle("Preserve Edges", preserveEdges);
+                using (new EditorGUI.DisabledScope(!preserveEdges || silhouetteFirstMode))
+                {
+                    edgeStrengthThreshold = EditorGUILayout.Slider("Edge Strength Threshold", edgeStrengthThreshold, 0f, 1f);
+                    outlineColor = (OutlineBlockColor)EditorGUILayout.EnumPopup("Outline Color", outlineColor);
+                    applyOutlineAfterCleanup = EditorGUILayout.Toggle("Apply Outline After Cleanup", applyOutlineAfterCleanup);
+                }
             }
 
             EditorGUILayout.Space();
@@ -138,21 +192,39 @@ namespace EliminateGame.Editor.Visual
             GeneratedCellsResult generatedResult;
             try
             {
-                generatedResult = GenerateCells(
-                    sourceImage,
-                    Mathf.Clamp01(alphaThreshold),
-                    backgroundToNone,
-                    backgroundSampleMode,
-                    Mathf.Clamp01(backgroundTolerance),
-                    brightnessToNone,
-                    Mathf.Clamp01(darkToNoneThreshold),
-                    Mathf.Clamp01(lightToNoneThreshold),
-                    Mathf.Clamp(noiseCleanupPasses, 0, 4),
-                    Mathf.Clamp(minimumNeighborCount, 1, 4),
-                    preserveEdges,
-                    Mathf.Clamp01(edgeStrengthThreshold),
-                    GetBlockColor(outlineColor),
-                    applyOutlineAfterCleanup);
+                generatedResult = silhouetteFirstMode
+                    ? GenerateSilhouetteFirstCells(
+                        sourceImage,
+                        Mathf.Clamp01(alphaThreshold),
+                        Mathf.Clamp01(foregroundThreshold),
+                        useLargestConnectedComponent,
+                        Mathf.Clamp(maskClosePasses, 0, 4),
+                        Mathf.Clamp(maskOpenPasses, 0, 3),
+                        Mathf.Clamp(interiorSimplifyPasses, 0, 4),
+                        Mathf.Clamp(keepHoleMinArea, 0, 50),
+                        Mathf.Clamp(maxPaletteColors, 1, 5),
+                        GetBlockColor(preferredFillColor),
+                        GetBlockColor(preferredAccentColor),
+                        GetBlockColor(preferredDetailColor),
+                        outlineEnabled,
+                        GetBlockColor(silhouetteOutlineColor),
+                        DefaultOutlineThickness,
+                        applyInteriorFloodFillBias)
+                    : GenerateCells(
+                        sourceImage,
+                        Mathf.Clamp01(alphaThreshold),
+                        backgroundToNone,
+                        backgroundSampleMode,
+                        Mathf.Clamp01(backgroundTolerance),
+                        brightnessToNone,
+                        Mathf.Clamp01(darkToNoneThreshold),
+                        Mathf.Clamp01(lightToNoneThreshold),
+                        Mathf.Clamp(noiseCleanupPasses, 0, 4),
+                        Mathf.Clamp(minimumNeighborCount, 1, 4),
+                        preserveEdges,
+                        Mathf.Clamp01(edgeStrengthThreshold),
+                        GetBlockColor(outlineColor),
+                        applyOutlineAfterCleanup);
             }
             catch (UnityException)
             {
@@ -181,9 +253,9 @@ namespace EliminateGame.Editor.Visual
 
             int noneCellCount = CountCells(generatedCells, BlockColor.None);
             int nonNoneCellCount = generatedCells.Count - noneCellCount;
-            string successMessage = $"Generated visual config: {outputPath} Width={OutputWidth} Height={OutputHeight} Cells={generatedCells.Count} NonNoneCells={nonNoneCellCount} NoneCells={noneCellCount} EdgeCells={generatedResult.EdgeCellCount}";
+            string successMessage = $"Generated visual config: {outputPath} Width={OutputWidth} Height={OutputHeight} Cells={generatedCells.Count} NonNoneCells={nonNoneCellCount} NoneCells={noneCellCount} ActivePalette={generatedResult.ActivePaletteLog}";
             SetStatus(successMessage, MessageType.Info);
-            Debug.Log($"{SuccessLogPrefix} {outputPath} Width={OutputWidth} Height={OutputHeight} Cells={generatedCells.Count} NonNoneCells={nonNoneCellCount} NoneCells={noneCellCount} EdgeCells={generatedResult.EdgeCellCount}");
+            Debug.Log($"{SuccessLogPrefix} {outputPath} Width={OutputWidth} Height={OutputHeight} Cells={generatedCells.Count} NonNoneCells={nonNoneCellCount} NoneCells={noneCellCount} ActivePalette={generatedResult.ActivePaletteLog}");
         }
 
         private bool ValidateInputs()
@@ -309,6 +381,473 @@ namespace EliminateGame.Editor.Visual
             }
 
             return new GeneratedCellsResult(cells, edgeCellCount);
+        }
+
+        private static GeneratedCellsResult GenerateSilhouetteFirstCells(
+            Texture2D texture,
+            float alphaCutoff,
+            float foregroundDistanceThreshold,
+            bool keepLargestComponentOnly,
+            int closePasses,
+            int openPasses,
+            int simplifyPasses,
+            int keepHoleMinArea,
+            int maxActivePaletteColors,
+            BlockColor preferredFillColor,
+            BlockColor preferredAccentColor,
+            BlockColor preferredDetailColor,
+            bool enableOutline,
+            BlockColor outlineBlockColor,
+            int outlineThickness,
+            bool biasInteriorFloodFill)
+        {
+            Color[] sampledColors = SampleCroppedTexture(texture);
+            Color backgroundColor = GetBackgroundColor(sampledColors, BackgroundSampleMode.FourCorners);
+            bool[] foregroundMask = BuildForegroundMask(sampledColors, backgroundColor, foregroundDistanceThreshold, alphaCutoff);
+
+            if (keepLargestComponentOnly)
+            {
+                foregroundMask = KeepLargestConnectedComponent(foregroundMask);
+            }
+
+            for (int pass = 0; pass < closePasses; pass++)
+            {
+                foregroundMask = ErodeMask(DilateMask(foregroundMask));
+            }
+
+            for (int pass = 0; pass < openPasses; pass++)
+            {
+                foregroundMask = DilateMask(ErodeMask(foregroundMask));
+            }
+
+            FillSmallInternalHoles(foregroundMask, keepHoleMinArea);
+
+            List<BlockColor> activePalette = BuildActivePalette(sampledColors, foregroundMask, maxActivePaletteColors, preferredFillColor);
+            BlockColor[] cells = new BlockColor[ExpectedCellCount];
+            for (int i = 0; i < cells.Length; i++)
+            {
+                cells[i] = foregroundMask[i] ? GetNearestBlockColor(sampledColors[i], activePalette) : BlockColor.None;
+            }
+
+            SimplifyInteriorColors(cells, foregroundMask, simplifyPasses);
+            if (biasInteriorFloodFill)
+            {
+                ApplyInteriorFloodFillBias(cells, foregroundMask, activePalette, preferredFillColor, preferredAccentColor, preferredDetailColor);
+            }
+
+            int outlineCellCount = 0;
+            if (enableOutline && outlineThickness == 1)
+            {
+                outlineCellCount = ApplySilhouetteOutline(cells, foregroundMask, outlineBlockColor);
+            }
+
+            for (int i = 0; i < cells.Length; i++)
+            {
+                if (!foregroundMask[i])
+                {
+                    cells[i] = BlockColor.None;
+                }
+            }
+
+            return new GeneratedCellsResult(new List<BlockColor>(cells), outlineCellCount, BuildPaletteLog(activePalette));
+        }
+
+        private static bool[] BuildForegroundMask(Color[] sampledColors, Color backgroundColor, float threshold, float alphaCutoff)
+        {
+            float thresholdSquared = threshold * threshold;
+            bool[] mask = new bool[ExpectedCellCount];
+            for (int i = 0; i < sampledColors.Length; i++)
+            {
+                mask[i] = sampledColors[i].a >= alphaCutoff && GetRgbDistanceSquared(sampledColors[i], backgroundColor) >= thresholdSquared;
+            }
+
+            return mask;
+        }
+
+        private static bool[] KeepLargestConnectedComponent(bool[] mask)
+        {
+            bool[] visited = new bool[ExpectedCellCount];
+            bool[] largest = new bool[ExpectedCellCount];
+            int largestCount = 0;
+            Queue<int> queue = new Queue<int>();
+            List<int> component = new List<int>();
+
+            for (int i = 0; i < ExpectedCellCount; i++)
+            {
+                if (!mask[i] || visited[i])
+                {
+                    continue;
+                }
+
+                component.Clear();
+                visited[i] = true;
+                queue.Enqueue(i);
+                while (queue.Count > 0)
+                {
+                    int current = queue.Dequeue();
+                    component.Add(current);
+                    foreach (int neighbor in GetNeighborIndexes(current))
+                    {
+                        if (!mask[neighbor] || visited[neighbor])
+                        {
+                            continue;
+                        }
+
+                        visited[neighbor] = true;
+                        queue.Enqueue(neighbor);
+                    }
+                }
+
+                if (component.Count <= largestCount)
+                {
+                    continue;
+                }
+
+                Array.Clear(largest, 0, largest.Length);
+                for (int c = 0; c < component.Count; c++)
+                {
+                    largest[component[c]] = true;
+                }
+
+                largestCount = component.Count;
+            }
+
+            return largest;
+        }
+
+        private static bool[] DilateMask(bool[] mask)
+        {
+            bool[] result = new bool[ExpectedCellCount];
+            for (int i = 0; i < ExpectedCellCount; i++)
+            {
+                if (mask[i])
+                {
+                    result[i] = true;
+                    continue;
+                }
+
+                foreach (int neighbor in GetNeighborIndexes(i))
+                {
+                    if (mask[neighbor])
+                    {
+                        result[i] = true;
+                        break;
+                    }
+                }
+            }
+
+            return result;
+        }
+
+        private static bool[] ErodeMask(bool[] mask)
+        {
+            bool[] result = new bool[ExpectedCellCount];
+            for (int y = 0; y < OutputHeight; y++)
+            {
+                for (int x = 0; x < OutputWidth; x++)
+                {
+                    int index = (y * OutputWidth) + x;
+                    if (!mask[index])
+                    {
+                        continue;
+                    }
+
+                    bool keep = true;
+                    foreach (int neighbor in GetNeighborIndexes(index))
+                    {
+                        if (!mask[neighbor])
+                        {
+                            keep = false;
+                            break;
+                        }
+                    }
+
+                    result[index] = keep;
+                }
+            }
+
+            return result;
+        }
+
+        private static void FillSmallInternalHoles(bool[] foregroundMask, int keepHoleMinArea)
+        {
+            bool[] visited = new bool[ExpectedCellCount];
+            Queue<int> queue = new Queue<int>();
+            List<int> component = new List<int>();
+
+            for (int i = 0; i < ExpectedCellCount; i++)
+            {
+                if (foregroundMask[i] || visited[i])
+                {
+                    continue;
+                }
+
+                bool touchesBoundary = false;
+                component.Clear();
+                visited[i] = true;
+                queue.Enqueue(i);
+                while (queue.Count > 0)
+                {
+                    int current = queue.Dequeue();
+                    component.Add(current);
+                    int x = current % OutputWidth;
+                    int y = current / OutputWidth;
+                    touchesBoundary |= x == 0 || x == OutputWidth - 1 || y == 0 || y == OutputHeight - 1;
+
+                    foreach (int neighbor in GetNeighborIndexes(current))
+                    {
+                        if (foregroundMask[neighbor] || visited[neighbor])
+                        {
+                            continue;
+                        }
+
+                        visited[neighbor] = true;
+                        queue.Enqueue(neighbor);
+                    }
+                }
+
+                if (touchesBoundary || component.Count >= keepHoleMinArea)
+                {
+                    continue;
+                }
+
+                for (int c = 0; c < component.Count; c++)
+                {
+                    foregroundMask[component[c]] = true;
+                }
+            }
+        }
+
+        private static List<BlockColor> BuildActivePalette(Color[] sampledColors, bool[] foregroundMask, int maxActivePaletteColors, BlockColor preferredFillColor)
+        {
+            Dictionary<BlockColor, int> counts = new Dictionary<BlockColor, int>();
+            foreach (ColorMapping mapping in ColorMappings)
+            {
+                counts[mapping.BlockColor] = 0;
+            }
+
+            for (int i = 0; i < sampledColors.Length; i++)
+            {
+                if (foregroundMask[i])
+                {
+                    counts[GetNearestBlockColor(sampledColors[i])]++;
+                }
+            }
+
+            List<BlockColor> palette = new List<BlockColor>();
+            foreach (ColorMapping mapping in ColorMappings)
+            {
+                palette.Add(mapping.BlockColor);
+            }
+
+            palette.Sort((left, right) => counts[right].CompareTo(counts[left]));
+            int paletteCount = Mathf.Clamp(maxActivePaletteColors, 1, ColorMappings.Length);
+            if (palette.Count > paletteCount)
+            {
+                palette.RemoveRange(paletteCount, palette.Count - paletteCount);
+            }
+
+            if (palette.Count < 1)
+            {
+                palette.Add(preferredFillColor);
+            }
+            else if (!palette.Contains(preferredFillColor) && counts[palette[palette.Count - 1]] == 0)
+            {
+                palette[palette.Count - 1] = preferredFillColor;
+            }
+
+            return palette;
+        }
+
+        private static BlockColor GetNearestBlockColor(Color color, List<BlockColor> activePalette)
+        {
+            BlockColor nearestColor = activePalette.Count > 0 ? activePalette[0] : BlockColor.Purple;
+            float nearestDistance = float.MaxValue;
+            for (int i = 0; i < activePalette.Count; i++)
+            {
+                Color paletteColor = GetUnityColor(activePalette[i]);
+                float distance = GetRgbDistanceSquared(color, paletteColor);
+                if (distance < nearestDistance)
+                {
+                    nearestDistance = distance;
+                    nearestColor = activePalette[i];
+                }
+            }
+
+            return nearestColor;
+        }
+
+        private static void SimplifyInteriorColors(BlockColor[] cells, bool[] foregroundMask, int passes)
+        {
+            for (int pass = 0; pass < passes; pass++)
+            {
+                BlockColor[] previous = (BlockColor[])cells.Clone();
+                for (int i = 0; i < ExpectedCellCount; i++)
+                {
+                    if (!foregroundMask[i])
+                    {
+                        continue;
+                    }
+
+                    BlockColor current = previous[i];
+                    int sameCount = 0;
+                    BlockColor majorityColor = current;
+                    int majorityCount = 0;
+                    foreach (ColorMapping mapping in ColorMappings)
+                    {
+                        int count = 0;
+                        foreach (int neighbor in GetNeighborIndexes(i))
+                        {
+                            if (foregroundMask[neighbor] && previous[neighbor] == mapping.BlockColor)
+                            {
+                                count++;
+                            }
+                        }
+
+                        if (mapping.BlockColor == current)
+                        {
+                            sameCount = count;
+                        }
+
+                        if (count > majorityCount)
+                        {
+                            majorityCount = count;
+                            majorityColor = mapping.BlockColor;
+                        }
+                    }
+
+                    if (sameCount == 0 && majorityCount >= 2)
+                    {
+                        cells[i] = majorityColor;
+                    }
+                }
+            }
+        }
+
+        private static void ApplyInteriorFloodFillBias(
+            BlockColor[] cells,
+            bool[] foregroundMask,
+            List<BlockColor> activePalette,
+            BlockColor preferredFillColor,
+            BlockColor preferredAccentColor,
+            BlockColor preferredDetailColor)
+        {
+            if (!activePalette.Contains(preferredFillColor))
+            {
+                preferredFillColor = activePalette.Count > 0 ? activePalette[0] : preferredFillColor;
+            }
+
+            for (int i = 0; i < ExpectedCellCount; i++)
+            {
+                if (!foregroundMask[i] || IsBoundaryCell(foregroundMask, i))
+                {
+                    continue;
+                }
+
+                BlockColor current = cells[i];
+                int sameCount = CountSameColorNeighbors(cells, i % OutputWidth, i / OutputWidth, current);
+                bool isPreferredAccent = current == preferredAccentColor || current == preferredDetailColor;
+                if (isPreferredAccent && sameCount >= 1)
+                {
+                    continue;
+                }
+
+                if (sameCount < 2 || current == BlockColor.None)
+                {
+                    cells[i] = preferredFillColor;
+                }
+            }
+        }
+
+        private static int ApplySilhouetteOutline(BlockColor[] cells, bool[] foregroundMask, BlockColor outlineBlockColor)
+        {
+            int outlineCount = 0;
+            for (int i = 0; i < ExpectedCellCount; i++)
+            {
+                if (!foregroundMask[i] || !IsBoundaryCell(foregroundMask, i))
+                {
+                    continue;
+                }
+
+                cells[i] = outlineBlockColor;
+                outlineCount++;
+            }
+
+            return outlineCount;
+        }
+
+        private static bool IsBoundaryCell(bool[] foregroundMask, int index)
+        {
+            int x = index % OutputWidth;
+            int y = index / OutputWidth;
+            if (x == 0 || x == OutputWidth - 1 || y == 0 || y == OutputHeight - 1)
+            {
+                return true;
+            }
+
+            foreach (int neighbor in GetNeighborIndexes(index))
+            {
+                if (!foregroundMask[neighbor])
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static IEnumerable<int> GetNeighborIndexes(int index)
+        {
+            int x = index % OutputWidth;
+            int y = index / OutputWidth;
+            if (y > 0)
+            {
+                yield return ((y - 1) * OutputWidth) + x;
+            }
+
+            if (y < OutputHeight - 1)
+            {
+                yield return ((y + 1) * OutputWidth) + x;
+            }
+
+            if (x > 0)
+            {
+                yield return (y * OutputWidth) + x - 1;
+            }
+
+            if (x < OutputWidth - 1)
+            {
+                yield return (y * OutputWidth) + x + 1;
+            }
+        }
+
+        private static Color GetUnityColor(BlockColor blockColor)
+        {
+            foreach (ColorMapping mapping in ColorMappings)
+            {
+                if (mapping.BlockColor == blockColor)
+                {
+                    return mapping.Color;
+                }
+            }
+
+            return PurpleColor;
+        }
+
+        private static string BuildPaletteLog(List<BlockColor> activePalette)
+        {
+            if (activePalette.Count == 0)
+            {
+                return "None";
+            }
+
+            string[] names = new string[activePalette.Count];
+            for (int i = 0; i < activePalette.Count; i++)
+            {
+                names[i] = activePalette[i].ToString();
+            }
+
+            return string.Join(",", names);
         }
 
         private static bool[] BuildEdgeMap(Color[] sampledColors, float edgeStrengthCutoff)
@@ -635,6 +1174,24 @@ namespace EliminateGame.Editor.Visual
             }
         }
 
+        private static BlockColor GetBlockColor(BlockColorChoice blockColorChoice)
+        {
+            switch (blockColorChoice)
+            {
+                case BlockColorChoice.Red:
+                    return BlockColor.Red;
+                case BlockColorChoice.Blue:
+                    return BlockColor.Blue;
+                case BlockColorChoice.Green:
+                    return BlockColor.Green;
+                case BlockColorChoice.Yellow:
+                    return BlockColor.Yellow;
+                case BlockColorChoice.Purple:
+                default:
+                    return BlockColor.Purple;
+            }
+        }
+
         private LargePatternVisualConfig LoadOrCreateOutputAsset(string assetPath)
         {
             LargePatternVisualConfig config = AssetDatabase.LoadAssetAtPath<LargePatternVisualConfig>(assetPath);
@@ -713,16 +1270,32 @@ namespace EliminateGame.Editor.Visual
             Purple
         }
 
+        private enum BlockColorChoice
+        {
+            Red,
+            Blue,
+            Green,
+            Yellow,
+            Purple
+        }
+
         private readonly struct GeneratedCellsResult
         {
             public GeneratedCellsResult(List<BlockColor> cells, int edgeCellCount)
+                : this(cells, edgeCellCount, edgeCellCount.ToString())
+            {
+            }
+
+            public GeneratedCellsResult(List<BlockColor> cells, int edgeCellCount, string activePaletteLog)
             {
                 Cells = cells;
                 EdgeCellCount = edgeCellCount;
+                ActivePaletteLog = activePaletteLog;
             }
 
             public List<BlockColor> Cells { get; }
             public int EdgeCellCount { get; }
+            public string ActivePaletteLog { get; }
         }
 
         private readonly struct ColorMapping
