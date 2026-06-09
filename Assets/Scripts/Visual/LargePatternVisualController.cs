@@ -51,14 +51,13 @@ namespace EliminateGame.Visual
             {
                 for (int x = 0; x < visualConfig.Width; x++)
                 {
-                    BlockColor color = visualConfig.GetCell(x, y);
-                    if (color == BlockColor.None)
+                    if (!TryGetVisualCellColor(x, y, out Color visualColor))
                     {
                         continue;
                     }
 
                     nonNoneCellCount++;
-                    SpriteRenderer renderer = CreateVisualCell(root, color);
+                    SpriteRenderer renderer = CreateVisualCell(root, visualColor);
                     if (renderer == null)
                     {
                         continue;
@@ -155,7 +154,30 @@ namespace EliminateGame.Visual
             }
         }
 
-        private SpriteRenderer CreateVisualCell(Transform root, BlockColor color)
+        private bool TryGetVisualCellColor(int x, int y, out Color visualColor)
+        {
+            visualColor = Color.clear;
+            if (visualConfig == null)
+            {
+                return false;
+            }
+
+            if (visualConfig.HasValidPaletteData)
+            {
+                return visualConfig.TryGetPaletteCellColor(x, y, out visualColor);
+            }
+
+            BlockColor legacyColor = visualConfig.GetCell(x, y);
+            if (legacyColor == BlockColor.None)
+            {
+                return false;
+            }
+
+            visualColor = MapColor(legacyColor);
+            return visualColor.a > 0.001f;
+        }
+
+        private SpriteRenderer CreateVisualCell(Transform root, Color color)
         {
             GameObject visualObject = tileVisualPrefab != null
                 ? Instantiate(tileVisualPrefab, root)
@@ -182,7 +204,7 @@ namespace EliminateGame.Visual
             }
 
             renderer.drawMode = SpriteDrawMode.Simple;
-            renderer.color = MapColor(color);
+            renderer.color = color;
             return renderer;
         }
 
