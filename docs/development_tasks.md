@@ -7,6 +7,13 @@
 - [x] first-row unlock
 - [x] orthogonal unlock
 - [x] SelectionArea only input source
+- [x] visual display color can be aligned through `GameplayColorVisualMapping`
+
+Rules locked:
+- SelectionArea remains the only player input source.
+- SelectionArea tile internal color remains gameplay `BlockColor`.
+- Visual display color mapping must not change click / unlock / solvability semantics.
+- Diagonal unlock remains forbidden.
 
 ---
 
@@ -20,18 +27,32 @@
 - [x] TMP integration
 - [x] progress += removedCount
 - [x] slot removal at 3/3
+- [x] stale color cleanup
+- [x] visual display color can be aligned through `GameplayColorVisualMapping`
+
+Rules locked:
+- TempZone slot internal color remains gameplay `BlockColor`.
+- TempZone `ProgressMark` semantics remain unchanged.
+- Visual display color mapping must not change progress behavior.
 
 ---
 
 # C. Pattern（完成）
 
-- [x] visualization
+- [x] logical grid
 - [x] bottom-row resolve source
 - [x] ghost feedback
 - [x] column gravity
 - [x] collapse
 - [x] camera shake
 - [x] no cross-column movement
+- [x] stable original cell identity for visual sync
+- [x] gameplay Pattern visual can be hidden for presentation while logic remains active
+
+Rules locked:
+- Pattern logical state remains runtime source of truth.
+- Pattern visual hiding must not delete Pattern logical cells.
+- PatternController removed-cell events must continue.
 
 ---
 
@@ -59,6 +80,10 @@ removeCount =
 - TempZone progress += removeCount
 - progress == 3 时移除 slot
 
+禁止：
+- 不允许改公式。
+- 不允许 visual task 修改 resolve semantics。
+
 ---
 
 # E. Runtime Stability（完成）
@@ -85,6 +110,12 @@ removeCount =
   sum(3 - TempZoneSlot.ProgressMark for same color)
   ```
 
+Locked:
+- Visual palette cells are excluded from RuntimeInvariantValidator.
+- Visual palette cells are excluded from DeterministicSolvabilityValidator.
+- No hidden auto-fix.
+- No silent gameplay mutation.
+
 ---
 
 # F. Win/Lose（完成）
@@ -94,6 +125,8 @@ removeCount =
 - [x] input lock
 - [x] WIN/LOSE text
 - [x] TempZone cleanup after WIN
+- [x] LargePatternVisual fully hides all remaining visual cells on WIN
+- [x] LargePatternVisual restores visual state on Restart
 
 ---
 
@@ -105,6 +138,7 @@ removeCount =
 - [x] Editor Validation workflow documented
 - [x] committed level content must pass Editor Validation before commit
 - [x] stable baseline workflow documented for duplicating known-good GameConfig assets
+- [x] visual-only LargePatternVisual restrictions documented
 
 Level production must follow:
 
@@ -145,7 +179,6 @@ Assets/GameConfigs/Levels/Level_001_GameConfig.asset
 ```
 
 Verified state:
-
 - [x] `Level_001_GameConfig` exists under `Assets/GameConfigs/Levels/`
 - [x] `GameManager` uses `Level_001_GameConfig`
 - [x] `Level_001` passes Editor Validation
@@ -154,12 +187,6 @@ Verified state:
 - [x] `RuntimeInvariantValidator` remains active during valid gameplay
 
 Level_001 is the stable baseline for future authored levels.
-
-Do not claim additional level assets exist until they are actually created and verified.
-
-Do not claim multi-level progression exists.
-
-Do not claim procedural generation exists.
 
 ---
 
@@ -172,7 +199,6 @@ Assets/GameConfigs/Levels/Level_002_GameConfig.asset
 ```
 
 Verified by user:
-
 - [x] `Level_002_GameConfig` exists under `Assets/GameConfigs/Levels/`
 - [x] Green color was added
 - [x] Unity compile has no red errors
@@ -183,7 +209,6 @@ Verified by user:
 - [x] `Level_002` is the first verified small expansion prototype
 
 Current Level_002 limits and counts:
-
 - Pattern non-None cells = 27
 - SelectionArea tiles = 9
 - Pattern non-None cells <= 45
@@ -193,21 +218,10 @@ Current Level_002 limits and counts:
 - `PatternCount[color] = SelectionAreaCount[color] * 3` holds for all colors
 
 Scope:
-
 - `Level_002` is not a large-level support milestone.
 - `Level_002` is not the new large-level baseline.
 - `Level_002` is not procedural generation.
 - `Level_002` is not multi-level progression.
-
-Temporary scaling warnings remain active:
-
-- Do not create oversized levels yet.
-- Do not exceed Pattern non-None cells <= 45.
-- Do not exceed SelectionArea tiles <= 15.
-- Large-level support is still not production-ready.
-- Resolve-chain budget, log throttling, deterministic validation search budget, and performance caps still need further testing before scaling up.
-- Random-looking mixed layouts can still explode deterministic solvability search complexity.
-- For now, level growth must remain gradual and validation-budget-friendly.
 
 ---
 
@@ -220,7 +234,6 @@ Assets/GameConfigs/Levels/Level_003_GameConfig.asset
 ```
 
 Verified by user after the simplified 36 / 12 fix:
-
 - [x] `Level_003_GameConfig` exists under `Assets/GameConfigs/Levels/`
 - [x] Editor Validation = PASS
 - [x] Play Mode result = WIN
@@ -233,7 +246,6 @@ Verified by user after the simplified 36 / 12 fix:
 - [x] `Level_003` is the second verified small expansion prototype after `Level_002`
 
 Current Level_003 verified design:
-
 - Pattern non-None cells = 36
 - SelectionArea tiles = 12
 - Pattern dimensions = 6 rows x 6 columns
@@ -250,12 +262,12 @@ Current Level_003 verified design:
 - `PatternCount[color] = SelectionAreaCount[color] * 3` holds for all colors
 
 Rejected Level_003 history:
-
 - Rejected attempt used Pattern non-None cells = 42
 - Rejected attempt used SelectionArea tiles = 14
 - Rejected attempt used 4 colors and no Purple
 - Rejected attempt exceeded `MaxSearchNodes = 200000` during deterministic solvability validation
-- Observed error:
+
+Observed error:
 
 ```text
 [SOLVABILITY_VALIDATION][GameManager.StartRun] FAILED
@@ -264,7 +276,6 @@ This level may be too complex for deterministic validation.
 ```
 
 Fix record:
-
 - `Level_003` was simplified to Pattern non-None cells = 36
 - `Level_003` was simplified to SelectionArea tiles = 12
 - The fix was data-only
@@ -273,7 +284,6 @@ Fix record:
 - `DeterministicSolvabilityValidator` was not bypassed
 
 Scope:
-
 - `Level_003` is a small safe prototype.
 - `Level_003` is not a large-level support milestone.
 - `Level_003` is not the new large-level baseline.
@@ -282,17 +292,13 @@ Scope:
 - `Level_003` does not prove production-ready scaling.
 
 Temporary scaling warnings remain active:
-
-- Do not create oversized levels yet.
+- Do not create oversized gameplay levels yet.
 - Do not exceed Pattern non-None cells <= 45.
 - Do not exceed SelectionArea tiles <= 15.
-- Large-level support is still not production-ready.
-- Resolve-chain budget, log throttling, deterministic validation search budget, and performance caps still need further testing before scaling up.
+- Large-level gameplay support is still not production-ready.
 - Random-looking mixed layouts can still explode deterministic solvability search complexity.
-- For now, level growth must remain gradual and validation-budget-friendly.
 
 ---
-
 
 # K. LargePatternVisual Gameplay Sync Prototype（完成 / Verified）
 
@@ -303,7 +309,6 @@ LargePatternVisual Gameplay Sync Prototype
 ```
 
 Verified by user:
-
 - [x] Console red errors = 0
 - [x] Clicking SelectionArea tiles causes regions of the 30x28 LargePatternVisual to disappear
 - [x] Original gameplay Pattern still resolves normally
@@ -316,7 +321,6 @@ Verified by user:
 - [x] MaxSearchNodes is not triggered
 
 Scope:
-
 - [x] visual-only 30x28 large pixel wall
 - [x] driven by small gameplay Pattern removals
 - [x] does not increase solver complexity
@@ -332,118 +336,173 @@ TempZone
 SelectionArea
 ```
 
-Visual sync route:
+---
+
+# L. Image-to-LargePatternVisualConfig Pipeline（完成 / Verified）
+
+Milestone group:
 
 ```text
-Gameplay Pattern cell removed
-→ PatternController emits removed-cell event
-→ visual binder maps removed gameplay cell to a region of 30x28 visual pixels
-→ LargePatternVisualController hides those visual pixels
+Image-to-LargePatternVisualConfig Pipeline 1.0
+Visual Palette Expansion 1.0
+LargePatternVisual Vertical Orientation Fix 1.0
 ```
 
-Stable coordinate mapping:
+Verified by user:
+- [x] Unity compile has no red errors
+- [x] menu exists at `Tools / Eliminate Game / Visual / Generate Large Pattern From Image`
+- [x] source image can generate 30x28 visual config
+- [x] visual config uses visual-only palette data
+- [x] generated image orientation displays correctly
+- [x] output remains visual-only
 
-- [x] `PatternCell` stores stable `OriginalRow` and `OriginalColumn`
-- [x] `PatternRemovedCell` exposes `OriginalRow`, `OriginalColumn`, `CurrentRow`, `CurrentColumn`, and `Color`
-- [x] visual binder maps LargePatternVisual regions using `OriginalRow` and `OriginalColumn`
-- [x] ghost effects and current-position visuals use `CurrentRow` and `CurrentColumn`
-
-Reason for original-coordinate mapping:
-
-- The first visual-sync attempt used current row / column mapping.
-- Current row / column changes over time because Pattern uses bottom-row resolve, column gravity, and collapse.
-- Original coordinates prevent visual regions from repeatedly mapping to the same runtime position.
-- Original coordinates allow WIN to fully clear the LargePatternVisual.
-- Restart restores the LargePatternVisual fully.
-
-Non-gameplay guarantees:
-
-- [x] 30x28 LargePatternVisual does not participate in DeterministicSolvabilityValidator
-- [x] 30x28 LargePatternVisual does not participate in RuntimeInvariantValidator
-- [x] 30x28 LargePatternVisual does not participate in PatternCount
-- [x] 30x28 LargePatternVisual does not participate in SelectionArea count
-- [x] 30x28 LargePatternVisual does not participate in TempZone debt
-- [x] 30x28 LargePatternVisual does not decide WIN / LOSE
-- [x] DeterministicSolvabilityValidator was not modified
-
-Scaling warnings remain active:
-
-- Do not make 30x28 visual pixels into gameplay cells.
-- Do not add 840 cells into GameConfig Pattern.
-- Do not bypass deterministic validation.
-- Do not disable RuntimeInvariantValidator.
-- Do not increase MaxSearchNodes as a workaround.
-- Large-level gameplay support is still not production-ready.
-
----
-
-# 当前阶段
-
-System Stabilization and Level Authoring Documentation
-
-当前重点：
-- regression prevention
-- runtime validation
-- solvability validation
-- progress-driven semantics lock
-- Level_001 stable baseline is recorded
-- Level_002 first verified small expansion prototype is recorded
-- Level_003 second verified small expansion prototype is recorded
-- level production must follow `docs/level_authoring_guide.md`
-- Editor Validation must pass before committing new levels
-- Play Mode test must reach WIN before committing new levels
-- Console red errors must be 0 before committing new levels
-- RuntimeInvariantValidator remains active
-- LargePatternVisual Gameplay Sync Prototype is documented as verified
-- 30x28 LargePatternVisual remains visual-only and gameplay-sync driven
-
----
-
-# 当前 level authoring workflow
-
-For any new level or edited level:
-
-1. Duplicate a stable `GameConfig`.
-2. Edit level data only.
-3. Run Editor Validation.
-4. Play test to WIN.
-5. Require `Console red errors = 0` before commit.
-
-The current stable source asset for duplication is:
+Current generated assets:
 
 ```text
-Assets/GameConfigs/Levels/Level_001_GameConfig.asset
+Assets/GameConfigs/Visual/LargePatternVisual_30x28_FromImage.asset
+Assets/GameConfigs/Visual/LargePatternVisual_30x28_FromImage_ColorMapping.asset
 ```
 
----
-
-# 下一阶段（未开始）
-
-## Level Pipeline
-
-- [ ] procedural generation
-- [ ] auto-generated layouts
-- [ ] deterministic level generation
-
-These items are not implemented and must not be described as existing gameplay features.
+Rules:
+- [x] 30x28 remains visual-only
+- [x] 840 cells are visual cells, not gameplay cells
+- [x] generated config does not enter solver
+- [x] generated config does not enter RuntimeInvariantValidator
+- [x] generated config does not decide WIN / LOSE
 
 ---
 
-## Content
+# M. Visual Palette Expansion 1.0（完成 / Verified）
 
-- [x] first verified small expansion prototype: `Level_002_GameConfig`
-- [x] second verified small expansion prototype: `Level_003_GameConfig`
-- [ ] additional verified level assets
-- [ ] additional patterns
-- [ ] difficulty curves
-- [ ] multi-level progression
+Purpose:
+- Replace extremely limited LargePatternVisual color approximation with visual-only fixed palette support.
+- Support broader cartoon/image colors such as black, white, gray, pink, peach, cream, browns, red, orange, yellow, green, teal, blues, purple.
 
-These items are not implemented and must not be described as existing gameplay features.
+Verified by user:
+- [x] LargePatternVisual displays closer image-derived mosaic colors
+- [x] monkey source image no longer collapses into only Red / Blue / Green / Yellow / Purple
+- [x] gameplay BlockColor was not expanded to 16 gameplay colors
+- [x] visual palette remains presentation-only
+
+Rules:
+- visual palette does not modify gameplay BlockColor semantics
+- visual palette does not modify PatternCount
+- visual palette does not modify SelectionAreaCount
+- visual palette does not modify TempZoneDebt
 
 ---
 
-## Presentation
+# N. Presentation Alignment 1.0（完成 / Verified）
 
-- [ ] better VFX
-- [ ] transitions
-- [ ] production UI
+Purpose:
+- Hide left gameplay Pattern visual by default while keeping Pattern logical data active.
+- Make player focus on the 30x28 LargePatternVisual.
+
+Verified by user:
+- [x] left gameplay Pattern visual is hidden
+- [x] gameplay still progresses
+- [x] PatternController logic and removed-cell events still work
+- [x] Console red errors = 0
+
+Rules:
+- Pattern visual hiding is presentation-only
+- Pattern logical data remains runtime source of truth
+- Pattern visual hiding does not change resolve, gravity, collapse, or win/lose
+
+---
+
+# O. Visual Interaction Alignment 1.0（完成 / Verified）
+
+Purpose:
+- Align SelectionArea / TempZone display colors with LargePatternVisual main palette groups.
+- Use PaletteTarget removal so clicks visually remove related color groups instead of obvious rectangular regions.
+
+Completed:
+- [x] `GameplayColorVisualMapping` added as visual-only mapping
+- [x] SelectionArea display colors can use mapping display colors
+- [x] TempZone display colors can use mapping display colors
+- [x] PatternToLargeVisualBinder supports PaletteTarget removal
+- [x] Region removal remains fallback/debug
+- [x] LargePatternVisualController tracks palette indices for visual-only hiding
+
+Verified by user:
+- [x] SelectionArea colors changed from pure Red / Blue / Green / Yellow to image-related display colors
+- [x] TempZone display color aligns with clicked visual color
+- [x] clicking SelectionArea still triggers gameplay
+- [x] LargePatternVisual hides palette-targeted cells instead of a clear rectangle region
+- [x] Console red errors = 0
+
+Rules:
+- internal gameplay colors remain gameplay `BlockColor`
+- display mapping is visual-only
+- PaletteTarget removal is visual-only
+- WIN still depends on gameplay Pattern being empty
+- Restart restores visual state
+
+---
+
+# P. Current stage（收口）
+
+Current stage closed as:
+
+```text
+Visual-only large pixel presentation pipeline verified.
+Gameplay remains small-pattern driven.
+30x28 remains presentation layer only.
+```
+
+Validated user-visible state:
+- 30x28 mosaic image appears correctly oriented
+- gameplay Pattern visual hidden
+- SelectionArea visual colors mapped to image palette groups
+- TempZone visual colors mapped to same groups
+- PaletteTarget visual removal works
+- Console red errors = 0
+- RuntimeInvariantValidator clean
+- MaxSearchNodes not triggered
+
+---
+
+# Q. Next stage（未开始）
+
+Recommended next milestone:
+
+```text
+Visual Polish 1.0
+```
+
+Suggested tasks:
+- [ ] background visual polish
+- [ ] LargePatternVisual positioning and scale polish
+- [ ] SelectionArea layout polish
+- [ ] TempZone layout polish
+- [ ] fade / scale hide animation for LargePatternVisual cells
+- [ ] UI polish
+- [ ] more suitable source-image preprocessing workflow
+
+Not recommended next:
+- do not enlarge gameplay Pattern
+- do not add 840 cells into gameplay
+- do not increase MaxSearchNodes as scaling fix
+
+---
+
+# R. Hard claims still forbidden
+
+Do not claim:
+- 30x28 gameplay Pattern exists
+- 840 gameplay cells are supported
+- large-level solver support exists
+- procedural generation exists
+- multi-level progression exists
+- production-ready large-level support exists
+
+Do not do:
+- make 30x28 visual pixels into gameplay cells
+- bypass deterministic validation
+- disable RuntimeInvariantValidator
+- modify progress-driven resolve formula
+- modify SelectionArea unlock semantics
+- modify Pattern gravity semantics
+- add cross-column Pattern movement
+- mutate runtime gameplay rules for presentation
