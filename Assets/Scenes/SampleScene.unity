@@ -542,6 +542,7 @@ MonoBehaviour:
   visualScale: 0.95
   sortingOrderBase: 300
   sortingOrderRowStride: 20
+  showGameplayPatternVisual: 0
   fallDuration: 0.5
   ghostDuration: 0.12
 --- !u!1 &830354239
@@ -998,6 +999,9 @@ MonoBehaviour:
   visualWidth: 30
   visualHeight: 28
   bindOnStart: 1
+  removalMode: 1
+  partialHideRatio: 0.45
+  deterministicHideSeed: 12345
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
