@@ -1,6 +1,7 @@
 using System;
 using EliminateGame.Pattern;
 using EliminateGame.Audio;
+using EliminateGame.Visual;
 using UnityEngine;
 
 namespace EliminateGame.SelectionArea
@@ -11,6 +12,7 @@ namespace EliminateGame.SelectionArea
         [SerializeField] private int x;
         [SerializeField] private int y;
         [SerializeField] private bool isUnlocked;
+        [SerializeField] private GameplayColorVisualMapping visualMapping;
 
         private static Sprite generatedTileSprite;
         private SpriteRenderer spriteRenderer;
@@ -30,13 +32,14 @@ namespace EliminateGame.SelectionArea
             UpdateVisualState();
         }
 
-        public void Initialize(int gridX, int gridY, BlockColor tileColor, bool startUnlocked)
+        public void Initialize(int gridX, int gridY, BlockColor tileColor, bool startUnlocked, GameplayColorVisualMapping mapping = null)
         {
             EnsureComponents();
 
             x = gridX;
             y = gridY;
             color = tileColor;
+            visualMapping = mapping;
             IsRemoved = false;
             transform.localScale = new Vector3(0.95f, 0.95f, 1f);
 
@@ -136,7 +139,8 @@ namespace EliminateGame.SelectionArea
                 return;
             }
 
-            var baseColor = ToUnityColor(color);
+            var fallbackColor = ToUnityColor(color);
+            var baseColor = visualMapping != null ? visualMapping.GetDisplayColor(color, fallbackColor) : fallbackColor;
             spriteRenderer.color = isUnlocked ? baseColor : baseColor * 0.4f;
         }
 

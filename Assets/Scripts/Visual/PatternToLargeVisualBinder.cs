@@ -9,12 +9,14 @@ namespace EliminateGame.Visual
     {
         private enum LargeVisualRemovalMode
         {
-            FullMappedRegion,
-            PartialMappedRegion
+            Region,
+            PaletteTarget
         }
+
         [Header("Controllers")]
         [SerializeField] private PatternController patternController;
         [SerializeField] private LargePatternVisualController largeVisualController;
+        [SerializeField] private GameplayColorVisualMapping visualMapping;
 
         [Header("Gameplay Pattern Dimensions")]
         [SerializeField, Min(1)] private int gameplayPatternWidth = 6;
@@ -28,8 +30,9 @@ namespace EliminateGame.Visual
         [SerializeField] private bool bindOnStart = true;
 
         [Header("Visual-only removal pacing")]
-        [SerializeField] private LargeVisualRemovalMode removalMode = LargeVisualRemovalMode.PartialMappedRegion;
-        [SerializeField, Range(0.1f, 1f)] private float partialHideRatio = 0.45f;
+        [SerializeField] private LargeVisualRemovalMode removalMode = LargeVisualRemovalMode.PaletteTarget;
+        [SerializeField, Min(1)] private int cellsToHidePerGameplayCell = 12;
+        [SerializeField] private bool preferBottomToTop = false;
         [SerializeField] private int deterministicHideSeed = 12345;
 
         private GameManager gameManager;
@@ -124,16 +127,57 @@ namespace EliminateGame.Visual
                 return;
             }
 
+            if (removalMode == LargeVisualRemovalMode.PaletteTarget)
+            {
+                HidePaletteTargetsOrFallback(removedCells);
+                return;
+            }
+
+            HideMappedRegions(removedCells);
+        }
+
+        private void HidePaletteTargetsOrFallback(IReadOnlyList<PatternRemovedCell> removedCells)
+        {
+            for (int i = 0; i < removedCells.Count; i++)
+            {
+                PatternRemovedCell removedCell = removedCells[i];
+                int hiddenCount = 0;
+                if (visualMapping != null && visualMapping.TryGetTargetPaletteIndices(removedCell.Color, out IReadOnlyList<int> targetPaletteIndices))
+                {
+                    hiddenCount = largeVisualController.HideCellsByPaletteIndices(targetPaletteIndices, cellsToHidePerGameplayCell, deterministicHideSeed + i, preferBottomToTop);
+                }
+
+                if (hiddenCount <= 0)
+                {
+                    hiddenCount = largeVisualController.HideAnyVisibleCells(cellsToHidePerGameplayCell, deterministicHideSeed + i, preferBottomToTop);
+                }
+
+                if (hiddenCount <= 0)
+                {
+                    HideMappedRegion(removedCell);
+                }
+            }
+        }
+
+        private void HideMappedRegions(IReadOnlyList<PatternRemovedCell> removedCells)
+        {
             HashSet<Vector2Int> coordinatesToHide = new HashSet<Vector2Int>();
             for (int i = 0; i < removedCells.Count; i++)
             {
-                AddMappedCoordinates(removedCells[i], coordinatesToHide);
+                AddMappedRegion(removedCells[i], coordinatesToHide);
             }
 
             largeVisualController.HideCells(coordinatesToHide);
         }
 
-        private void AddMappedCoordinates(PatternRemovedCell removedCell, HashSet<Vector2Int> coordinatesToHide)
+        private void HideMappedRegion(PatternRemovedCell removedCell)
+        {
+            HashSet<Vector2Int> coordinatesToHide = new HashSet<Vector2Int>();
+            AddMappedRegion(removedCell, coordinatesToHide);
+            largeVisualController.HideCells(coordinatesToHide);
+        }
+
+        private void AddMappedRegion(PatternRemovedCell removedCell, HashSet<Vector2Int> coordinatesToHide)
         {
             if (coordinatesToHide == null)
             {
@@ -141,14 +185,13 @@ namespace EliminateGame.Visual
             }
 
             GetMappedRegion(removedCell, out int startX, out int endX, out int startY, out int endY);
-
-            if (removalMode == LargeVisualRemovalMode.FullMappedRegion)
+            for (int y = startY; y <= endY; y++)
             {
-                AddFullMappedRegion(startX, endX, startY, endY, coordinatesToHide);
-                return;
+                for (int x = startX; x <= endX; x++)
+                {
+                    coordinatesToHide.Add(new Vector2Int(x, y));
+                }
             }
-
-            AddPartialMappedRegion(startX, endX, startY, endY, coordinatesToHide);
         }
 
         private void GetMappedRegion(PatternRemovedCell removedCell, out int startX, out int endX, out int startY, out int endY)
@@ -165,69 +208,6 @@ namespace EliminateGame.Visual
             endX = Mathf.Clamp(endX, 0, visualWidth - 1);
             startY = Mathf.Clamp(startY, 0, visualHeight - 1);
             endY = Mathf.Clamp(endY, 0, visualHeight - 1);
-        }
-
-        private static void AddFullMappedRegion(int startX, int endX, int startY, int endY, HashSet<Vector2Int> coordinatesToHide)
-        {
-            for (int y = startY; y <= endY; y++)
-            {
-                for (int x = startX; x <= endX; x++)
-                {
-                    coordinatesToHide.Add(new Vector2Int(x, y));
-                }
-            }
-        }
-
-        private void AddPartialMappedRegion(int startX, int endX, int startY, int endY, HashSet<Vector2Int> coordinatesToHide)
-        {
-            List<Vector2Int> visibleCoordinates = new List<Vector2Int>();
-            for (int y = startY; y <= endY; y++)
-            {
-                for (int x = startX; x <= endX; x++)
-                {
-                    if (largeVisualController != null && largeVisualController.IsCellVisible(x, y))
-                    {
-                        visibleCoordinates.Add(new Vector2Int(x, y));
-                    }
-                }
-            }
-
-            if (visibleCoordinates.Count <= 0)
-            {
-                return;
-            }
-
-            visibleCoordinates.Sort(CompareDeterministicHideOrder);
-            int hideCount = Mathf.Clamp(Mathf.CeilToInt(visibleCoordinates.Count * partialHideRatio), 1, visibleCoordinates.Count);
-            for (int i = 0; i < hideCount; i++)
-            {
-                coordinatesToHide.Add(visibleCoordinates[i]);
-            }
-        }
-
-        private int CompareDeterministicHideOrder(Vector2Int left, Vector2Int right)
-        {
-            int leftHash = GetDeterministicCellHash(left);
-            int rightHash = GetDeterministicCellHash(right);
-            int hashCompare = leftHash.CompareTo(rightHash);
-            if (hashCompare != 0)
-            {
-                return hashCompare;
-            }
-
-            int yCompare = left.y.CompareTo(right.y);
-            return yCompare != 0 ? yCompare : left.x.CompareTo(right.x);
-        }
-
-        private int GetDeterministicCellHash(Vector2Int coordinate)
-        {
-            unchecked
-            {
-                int hash = deterministicHideSeed;
-                hash = (hash * 397) ^ coordinate.x;
-                hash = (hash * 397) ^ coordinate.y;
-                return hash & int.MaxValue;
-            }
         }
     }
 }

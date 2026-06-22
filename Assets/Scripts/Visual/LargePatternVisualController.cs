@@ -18,8 +18,18 @@ namespace EliminateGame.Visual
         [SerializeField] private bool buildOnStart = true;
 
         private static Sprite cachedSolidSquareSprite;
+        private sealed class VisualCellState
+        {
+            public int X;
+            public int Y;
+            public int PaletteIndex;
+            public SpriteRenderer Renderer;
+            public bool IsVisible;
+        }
+
         private readonly List<SpriteRenderer> visualCells = new List<SpriteRenderer>();
-        private readonly Dictionary<Vector2Int, SpriteRenderer> visualCellLookup = new Dictionary<Vector2Int, SpriteRenderer>();
+        private readonly List<VisualCellState> visualCellStates = new List<VisualCellState>();
+        private readonly Dictionary<Vector2Int, VisualCellState> visualCellLookup = new Dictionary<Vector2Int, VisualCellState>();
 
         private void Start()
         {
@@ -51,7 +61,7 @@ namespace EliminateGame.Visual
             {
                 for (int x = 0; x < visualConfig.Width; x++)
                 {
-                    if (!TryGetVisualCellColor(x, y, out Color visualColor))
+                    if (!TryGetVisualCellColor(x, y, out Color visualColor, out int paletteIndex))
                     {
                         continue;
                     }
@@ -71,8 +81,17 @@ namespace EliminateGame.Visual
                     cellTransform.localScale = GetCompensatedCellScale(cellTransform.parent, visualConfig.CellSize);
                     renderer.sortingOrder = sortingOrderBase + ((visualConfig.Height - 1 - y) * visualConfig.Width) + x;
 
+                    VisualCellState state = new VisualCellState
+                    {
+                        X = x,
+                        Y = y,
+                        PaletteIndex = paletteIndex,
+                        Renderer = renderer,
+                        IsVisible = true
+                    };
                     visualCells.Add(renderer);
-                    visualCellLookup[new Vector2Int(x, y)] = renderer;
+                    visualCellStates.Add(state);
+                    visualCellLookup[new Vector2Int(x, y)] = state;
                 }
             }
 
@@ -82,14 +101,15 @@ namespace EliminateGame.Visual
 
         public bool IsCellVisible(int x, int y)
         {
-            return visualCellLookup.TryGetValue(new Vector2Int(x, y), out SpriteRenderer renderer) && renderer != null && renderer.enabled;
+            return visualCellLookup.TryGetValue(new Vector2Int(x, y), out VisualCellState state) && state != null && state.IsVisible && state.Renderer != null && state.Renderer.enabled;
         }
 
         public void HideCell(int x, int y)
         {
-            if (visualCellLookup.TryGetValue(new Vector2Int(x, y), out SpriteRenderer renderer) && renderer != null)
+            if (visualCellLookup.TryGetValue(new Vector2Int(x, y), out VisualCellState state) && state != null && state.Renderer != null)
             {
-                renderer.enabled = false;
+                state.Renderer.enabled = false;
+                state.IsVisible = false;
             }
         }
 
@@ -106,6 +126,63 @@ namespace EliminateGame.Visual
             }
         }
 
+        public int HideCellsByPaletteIndices(IReadOnlyCollection<int> paletteIndices, int maxCount, int deterministicSeed, bool preferBottomToTop = false)
+        {
+            if (paletteIndices == null || paletteIndices.Count == 0 || maxCount <= 0)
+            {
+                return 0;
+            }
+
+            HashSet<int> targetIndices = new HashSet<int>(paletteIndices);
+            List<VisualCellState> candidates = new List<VisualCellState>();
+            for (int i = 0; i < visualCellStates.Count; i++)
+            {
+                VisualCellState state = visualCellStates[i];
+                if (state != null && state.IsVisible && state.Renderer != null && targetIndices.Contains(state.PaletteIndex))
+                {
+                    candidates.Add(state);
+                }
+            }
+
+            candidates.Sort((left, right) => CompareDeterministicCellOrder(left, right, deterministicSeed, preferBottomToTop));
+            int hideCount = Mathf.Min(maxCount, candidates.Count);
+            for (int i = 0; i < hideCount; i++)
+            {
+                candidates[i].Renderer.enabled = false;
+                candidates[i].IsVisible = false;
+            }
+
+            return hideCount;
+        }
+
+        public int HideAnyVisibleCells(int maxCount, int deterministicSeed, bool preferBottomToTop = false)
+        {
+            if (maxCount <= 0)
+            {
+                return 0;
+            }
+
+            List<VisualCellState> candidates = new List<VisualCellState>();
+            for (int i = 0; i < visualCellStates.Count; i++)
+            {
+                VisualCellState state = visualCellStates[i];
+                if (state != null && state.IsVisible && state.Renderer != null)
+                {
+                    candidates.Add(state);
+                }
+            }
+
+            candidates.Sort((left, right) => CompareDeterministicCellOrder(left, right, deterministicSeed, preferBottomToTop));
+            int hideCount = Mathf.Min(maxCount, candidates.Count);
+            for (int i = 0; i < hideCount; i++)
+            {
+                candidates[i].Renderer.enabled = false;
+                candidates[i].IsVisible = false;
+            }
+
+            return hideCount;
+        }
+
         public void ResetVisualState()
         {
             SetAllVisualCellsEnabled(true);
@@ -118,12 +195,16 @@ namespace EliminateGame.Visual
 
         private void SetAllVisualCellsEnabled(bool enabled)
         {
-            for (int i = 0; i < visualCells.Count; i++)
+            for (int i = 0; i < visualCellStates.Count; i++)
             {
-                SpriteRenderer renderer = visualCells[i];
-                if (renderer != null)
+                VisualCellState state = visualCellStates[i];
+                if (state != null)
                 {
-                    renderer.enabled = enabled;
+                    state.IsVisible = enabled;
+                    if (state.Renderer != null)
+                    {
+                        state.Renderer.enabled = enabled;
+                    }
                 }
             }
         }
@@ -141,6 +222,7 @@ namespace EliminateGame.Visual
             }
 
             visualCells.Clear();
+            visualCellStates.Clear();
             visualCellLookup.Clear();
 
             Transform root = GetTileRoot();
@@ -159,9 +241,10 @@ namespace EliminateGame.Visual
             }
         }
 
-        private bool TryGetVisualCellColor(int x, int y, out Color visualColor)
+        private bool TryGetVisualCellColor(int x, int y, out Color visualColor, out int paletteIndex)
         {
             visualColor = Color.clear;
+            paletteIndex = LargePatternVisualConfig.TransparentPaletteIndex;
             if (visualConfig == null)
             {
                 return false;
@@ -169,7 +252,7 @@ namespace EliminateGame.Visual
 
             if (visualConfig.HasValidPaletteData)
             {
-                return visualConfig.TryGetPaletteCellColor(x, y, out visualColor);
+                return visualConfig.TryGetPaletteCellColor(x, y, out visualColor, out paletteIndex);
             }
 
             BlockColor legacyColor = visualConfig.GetCell(x, y);
@@ -179,6 +262,7 @@ namespace EliminateGame.Visual
             }
 
             visualColor = MapColor(legacyColor);
+            paletteIndex = -1;
             return visualColor.a > 0.001f;
         }
 
@@ -304,6 +388,39 @@ namespace EliminateGame.Visual
                     return new Color(0.6f, 0.2f, 0.8f);
                 default:
                     return Color.white;
+            }
+        }
+
+        private static int CompareDeterministicCellOrder(VisualCellState left, VisualCellState right, int seed, bool preferBottomToTop)
+        {
+            if (preferBottomToTop)
+            {
+                int yCompare = right.Y.CompareTo(left.Y);
+                if (yCompare != 0)
+                {
+                    return yCompare;
+                }
+            }
+
+            int hashCompare = GetDeterministicCellHash(left, seed).CompareTo(GetDeterministicCellHash(right, seed));
+            if (hashCompare != 0)
+            {
+                return hashCompare;
+            }
+
+            int yFallback = left.Y.CompareTo(right.Y);
+            return yFallback != 0 ? yFallback : left.X.CompareTo(right.X);
+        }
+
+        private static int GetDeterministicCellHash(VisualCellState state, int seed)
+        {
+            unchecked
+            {
+                int hash = seed;
+                hash = (hash * 397) ^ state.X;
+                hash = (hash * 397) ^ state.Y;
+                hash = (hash * 397) ^ state.PaletteIndex;
+                return hash & int.MaxValue;
             }
         }
 

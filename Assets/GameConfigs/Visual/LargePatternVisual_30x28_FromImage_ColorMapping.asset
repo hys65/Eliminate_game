@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8a284b1dda284c1b8f3e83e1cfb8edef, type: 3}
+  m_Name: LargePatternVisual_30x28_FromImage_ColorMapping
+  m_EditorClassIdentifier: 
+  mappings:
+  - GameplayColor: 1
+    DisplayColor: {r: 0.7882353, g: 0.5529412, b: 0.34901962, a: 1}
+    TargetPaletteIndices: 07000000080000000a000000
+    Note: LightBrown / DarkBrown / Orange
+  - GameplayColor: 2
+    DisplayColor: {r: 0.34901962, g: 0.7647059, b: 0.41568628, a: 1}
+    TargetPaletteIndices: 0c0000000d000000
+    Note: Green / Teal
+  - GameplayColor: 3
+    DisplayColor: {r: 0.9529412, g: 0.89411765, b: 0.7176471, a: 1}
+    TargetPaletteIndices: 020000000500000006000000
+    Note: White / Peach / Cream
+  - GameplayColor: 4
+    DisplayColor: {r: 0.96862745, g: 0.72156864, b: 0.84705883, a: 1}
+    TargetPaletteIndices: 04000000090000000b000000
+    Note: Pink / Red / Yellow
+  - GameplayColor: 5
+    DisplayColor: {r: 0.16862746, g: 0.16862746, b: 0.16862746, a: 1}
+    TargetPaletteIndices: 010000000f00000010000000
+    Note: Black / DarkBlue / Purple

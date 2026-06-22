@@ -16,6 +16,7 @@ namespace EliminateGame.Editor.Visual
         private const float DefaultBackgroundThreshold = 0.15f;
         private const float DefaultAlphaThreshold = 0.1f;
         private const string DefaultOutputPath = "Assets/GameConfigs/Visual/LargePatternVisual_30x28_FromImage.asset";
+        private const string DefaultMappingOutputPath = "Assets/GameConfigs/Visual/LargePatternVisual_30x28_FromImage_ColorMapping.asset";
         private const string SuccessLogPrefix = "[LargePatternVisualImageGenerator] Generated visual config:";
 
         private enum PalettePreset
@@ -134,13 +135,20 @@ namespace EliminateGame.Editor.Visual
 
             config.SetPaletteVisualData(OutputWidth, OutputHeight, Mathf.Max(0.01f, cellSize), paletteColors, cellPaletteIndices);
 
+            GameplayColorVisualMapping mapping = LoadOrCreateMappingAsset(DefaultMappingOutputPath);
+            if (mapping != null)
+            {
+                mapping.ResetToDefaultMapping();
+                EditorUtility.SetDirty(mapping);
+            }
+
             EditorUtility.SetDirty(config);
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
             int noneCellCount = CountCells(cellPaletteIndices, LargePatternVisualConfig.TransparentPaletteIndex);
             int nonNoneCellCount = cellPaletteIndices.Count - noneCellCount;
-            string successMessage = $"Generated visual config: {outputPath} Width={OutputWidth} Height={OutputHeight} Cells={cellPaletteIndices.Count} PaletteSize={paletteColors.Count} NonNoneCells={nonNoneCellCount} NoneCells={noneCellCount}";
+            string successMessage = $"Generated visual config: {outputPath} Width={OutputWidth} Height={OutputHeight} Cells={cellPaletteIndices.Count} PaletteSize={paletteColors.Count} NonNoneCells={nonNoneCellCount} NoneCells={noneCellCount} Mapping={DefaultMappingOutputPath}";
             SetStatus(successMessage, MessageType.Info);
             Debug.Log($"{SuccessLogPrefix} {outputPath} Width={OutputWidth} Height={OutputHeight} Cells={cellPaletteIndices.Count} PaletteSize={paletteColors.Count} NonNoneCells={nonNoneCellCount} NoneCells={noneCellCount}");
         }
@@ -351,6 +359,27 @@ namespace EliminateGame.Editor.Visual
             }
 
             return count;
+        }
+
+        private GameplayColorVisualMapping LoadOrCreateMappingAsset(string assetPath)
+        {
+            string directory = Path.GetDirectoryName(assetPath);
+            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+            {
+                Directory.CreateDirectory(directory);
+                AssetDatabase.Refresh();
+            }
+
+            GameplayColorVisualMapping mapping = AssetDatabase.LoadAssetAtPath<GameplayColorVisualMapping>(assetPath);
+            if (mapping != null)
+            {
+                return mapping;
+            }
+
+            mapping = CreateInstance<GameplayColorVisualMapping>();
+            mapping.ResetToDefaultMapping();
+            AssetDatabase.CreateAsset(mapping, assetPath);
+            return mapping;
         }
 
         private LargePatternVisualConfig LoadOrCreateOutputAsset(string assetPath)
