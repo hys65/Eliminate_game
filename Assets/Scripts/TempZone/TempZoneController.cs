@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using EliminateGame.Pattern;
+using EliminateGame.Visual;
 using TMPro;
 using UnityEngine;
 
@@ -14,6 +15,7 @@ namespace EliminateGame.TempZone
         [SerializeField] private Transform tileRoot;
         [SerializeField] private GameObject tileVisualPrefab;
         [SerializeField] private float spacing = 1.0f;
+        [SerializeField] private GameplayColorVisualMapping visualMapping;
 
         private readonly List<TempZoneSlot> slots = new List<TempZoneSlot>();
         private readonly List<TileVisualEntry> tileVisuals = new List<TileVisualEntry>();
@@ -347,7 +349,7 @@ namespace EliminateGame.TempZone
 
             renderer.sprite = GetSolidSquareSprite();
             renderer.drawMode = SpriteDrawMode.Simple;
-            renderer.color = MapColor(color);
+            renderer.color = GetDisplayColor(color);
             renderer.transform.localScale = new Vector3(0.95f, 0.95f, 1f);
         }
 
@@ -416,7 +418,7 @@ namespace EliminateGame.TempZone
                 renderer.transform.localScale = new Vector3(0.95f, 0.95f, 1f);
 
                 int progress = i < slots.Count ? slots[i].ProgressMark : 0;
-                renderer.color = ApplyProgressShade(MapColor(entry.Color), progress);
+                renderer.color = ApplyProgressShade(GetDisplayColor(entry.Color), progress);
                 UpdateProgressText(entry, progress);
             }
         }
@@ -477,7 +479,7 @@ namespace EliminateGame.TempZone
 
             int index = tileVisuals.IndexOf(entry);
             int progress = index >= 0 && index < slots.Count ? slots[index].ProgressMark : 0;
-            Color baseColor = ApplyProgressShade(MapColor(entry.Color), progress);
+            Color baseColor = ApplyProgressShade(GetDisplayColor(entry.Color), progress);
             Color brightColor = baseColor * 1.15f;
             brightColor.a = baseColor.a;
 
@@ -536,7 +538,7 @@ namespace EliminateGame.TempZone
                 return;
             }
 
-            entry.Renderer.color = ApplyProgressShade(MapColor(entry.Color), progressMark);
+            entry.Renderer.color = ApplyProgressShade(GetDisplayColor(entry.Color), progressMark);
             UpdateProgressText(entry, progressMark);
         }
 
@@ -620,6 +622,12 @@ namespace EliminateGame.TempZone
         private Transform GetTileRoot()
         {
             return tileRoot != null ? tileRoot : transform;
+        }
+
+        private Color GetDisplayColor(BlockColor color)
+        {
+            Color fallback = MapColor(color);
+            return visualMapping != null ? visualMapping.GetDisplayColor(color, fallback) : fallback;
         }
 
         private static Color MapColor(BlockColor color)

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using EliminateGame.Data;
 using EliminateGame.Pattern;
+using EliminateGame.Visual;
 using UnityEngine;
 
 namespace EliminateGame.SelectionArea
@@ -11,6 +12,7 @@ namespace EliminateGame.SelectionArea
         [SerializeField] private SelectionTile tilePrefab;
         [SerializeField] private Transform tileRoot;
         [SerializeField] private float spacing = 1.0f;
+        [SerializeField] private GameplayColorVisualMapping visualMapping;
 
         private readonly Dictionary<Vector2Int, SelectionTile> tiles = new Dictionary<Vector2Int, SelectionTile>();
 
@@ -66,7 +68,7 @@ namespace EliminateGame.SelectionArea
 
                 var tile = Instantiate(tilePrefab, parent);
                 tile.transform.localPosition = new Vector3(definition.X * spacing, -definition.Y * spacing, 0f) - centerOffset;
-                tile.Initialize(definition.X, definition.Y, definition.Color, definition.StartUnlocked);
+                tile.Initialize(definition.X, definition.Y, definition.Color, definition.StartUnlocked, visualMapping);
                 tile.Clicked += HandleTileClicked;
                 tiles.Add(key, tile);
             }

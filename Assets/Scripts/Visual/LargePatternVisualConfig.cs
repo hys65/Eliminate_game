@@ -60,14 +60,20 @@ namespace EliminateGame.Visual
 
         public bool TryGetPaletteCellColor(int x, int y, out Color color)
         {
+            return TryGetPaletteCellColor(x, y, out color, out _);
+        }
+
+        public bool TryGetPaletteCellColor(int x, int y, out Color color, out int paletteIndex)
+        {
             color = Color.clear;
+            paletteIndex = TransparentPaletteIndex;
             if (!ValidatePaletteData() || x < 0 || x >= width || y < 0 || y >= height)
             {
                 return false;
             }
 
             int cellIndex = (y * width) + x;
-            int paletteIndex = cellPaletteIndices[cellIndex];
+            paletteIndex = cellPaletteIndices[cellIndex];
             if (paletteIndex < 0 || paletteIndex >= paletteColors.Count)
             {
                 return false;

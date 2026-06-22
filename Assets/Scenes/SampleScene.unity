@@ -407,6 +407,7 @@ MonoBehaviour:
   tileRoot: {fileID: 1655432769}
   tileVisualPrefab: {fileID: 0}
   spacing: 1
+  visualMapping: {fileID: 11400000, guid: b5ef4e85a64d4b438889cda734290281, type: 2}
 --- !u!1 &619394800
 GameObject:
   m_ObjectHideFlags: 0
@@ -738,6 +739,7 @@ MonoBehaviour:
   tilePrefab: {fileID: 8273039707044253858, guid: 691dc1753f17669458999c7f940acacf, type: 3}
   tileRoot: {fileID: 1843886616}
   spacing: 1
+  visualMapping: {fileID: 11400000, guid: b5ef4e85a64d4b438889cda734290281, type: 2}
 --- !u!1 &1127312059
 GameObject:
   m_ObjectHideFlags: 0
@@ -994,13 +996,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::EliminateGame.Visual.PatternToLargeVisualBinder
   patternController: {fileID: 654914619}
   largeVisualController: {fileID: 2000000002}
+  visualMapping: {fileID: 11400000, guid: b5ef4e85a64d4b438889cda734290281, type: 2}
   gameplayPatternWidth: 6
   gameplayPatternHeight: 6
   visualWidth: 30
   visualHeight: 28
   bindOnStart: 1
   removalMode: 1
-  partialHideRatio: 0.45
+  cellsToHidePerGameplayCell: 12
+  preferBottomToTop: 0
   deterministicHideSeed: 12345
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
