@@ -4,6 +4,8 @@ This guide defines the current level authoring pipeline for the stable gameplay 
 
 Level authoring must not change gameplay semantics. A level is valid only when its data fits the existing runtime rules and passes the editor validation workflow, Play Mode WIN verification, and Console red error check.
 
+Visual-only presentation assets such as LargePatternVisual configs are not level gameplay data. They must not be counted as Pattern cells, SelectionArea tiles, TempZone debt, solver input, or win/lose state.
+
 ---
 
 ## 1. Current level data source: GameConfig
@@ -41,7 +43,7 @@ Use `Level_001_GameConfig` as the known stable baseline when starting new level 
 
 `Level_003_GameConfig` exists and has been verified by the user as the second small safe expansion prototype after the simplified 36 Pattern / 12 Selection fix. It is documented as data-only authored `GameConfig` content, not as a large-level support milestone, not as the new large-level baseline, and not as proof of production-ready scaling.
 
-`LargePatternVisual Gameplay Sync Prototype` has been verified by the user as a visual-only 30x28 large pixel wall driven by small gameplay Pattern removals. It is not a level asset, not a 30x28 gameplay Pattern, not 840 gameplay cells support, not large-level solver support, and not production-ready large-level gameplay support.
+`LargePatternVisual` is verified as a visual-only 30x28 large pixel presentation layer driven by small gameplay Pattern removals. It is not a level asset, not a 30x28 gameplay Pattern, not 840 gameplay cells support, not large-level solver support, and not production-ready large-level gameplay support.
 
 Do not claim another level asset exists until that asset is actually created, validated, Play tested to WIN, and recorded.
 
@@ -71,6 +73,8 @@ A level is not ready to commit if any of the following is true:
 - Play Mode has not been tested to WIN.
 - Console red errors are greater than 0.
 - RuntimeInvariantValidator is disabled or bypassed.
+- DeterministicSolvabilityValidator is bypassed.
+- `MaxSearchNodes` is increased as a workaround.
 
 ---
 
@@ -182,7 +186,8 @@ Rejected Level_003 history:
 - Original attempt used 4 colors.
 - Original attempt did not use Purple.
 - Original attempt exceeded `MaxSearchNodes = 200000` during deterministic solvability validation.
-- Observed error:
+
+Observed error:
 
 ```text
 [SOLVABILITY_VALIDATION][GameManager.StartRun] FAILED
@@ -212,25 +217,36 @@ Scope rules for Level_003:
 
 ---
 
-## 3. LargePatternVisual Gameplay Sync Prototype
+## 3. LargePatternVisual Presentation Pipeline
 
-Milestone name:
+Milestone group:
 
 ```text
 LargePatternVisual Gameplay Sync Prototype
+Image-to-LargePatternVisualConfig Pipeline 1.0
+Visual Palette Expansion 1.0
+Presentation Alignment 1.0
+Visual Interaction Alignment 1.0
+LargePatternVisual Vertical Orientation Fix 1.0
 ```
 
 Status:
 
 ```text
-Verified
+Verified visual-only presentation milestone
 ```
 
 User-verified result:
 
 - Console red errors = 0.
-- Clicking SelectionArea tiles causes regions of the 30x28 LargePatternVisual to disappear.
-- Original gameplay Pattern still resolves normally.
+- Left gameplay Pattern visual is hidden by default.
+- Gameplay Pattern logic still resolves normally.
+- SelectionArea remains the only input source.
+- SelectionArea display colors are mapped to image-related visual colors.
+- TempZone display colors are mapped to the same visual colors.
+- 30x28 LargePatternVisual displays image-derived mosaic with correct vertical orientation.
+- Clicking SelectionArea tiles causes LargePatternVisual palette-targeted cells to disappear gradually.
+- Visual removal is not a visible rectangle block by default.
 - Level reaches WIN.
 - On WIN, the LargePatternVisual fully disappears.
 - Menu -> Restart works.
@@ -248,6 +264,7 @@ Authoring meaning:
 - It must not be counted as SelectionArea tiles.
 - It must not be counted as TempZone debt.
 - It must not decide WIN / LOSE.
+- Its palette colors are presentation colors, not gameplay colors.
 
 Runtime source of truth remains:
 
@@ -257,7 +274,17 @@ TempZone
 SelectionArea
 ```
 
-The visual-only sync route is:
+Current visual-only sync route is:
+
+```text
+Gameplay Pattern cell removed
+→ PatternController emits removed-cell event
+→ PatternToLargeVisualBinder receives removed cell Color
+→ GameplayColorVisualMapping resolves visual target palette indices
+→ LargePatternVisualController hides matching visible palette cells
+```
+
+Region fallback route remains available:
 
 ```text
 Gameplay Pattern cell removed
@@ -266,17 +293,18 @@ Gameplay Pattern cell removed
 → LargePatternVisualController hides those visual pixels
 ```
 
-Stable original-coordinate mapping:
+Stable original-coordinate mapping for Region fallback:
 
 - Current row / column is not stable for visual-region mapping because Pattern uses bottom-row resolve, column gravity, and collapse.
 - `PatternCell` stores stable `OriginalRow` and `OriginalColumn`.
 - `PatternRemovedCell` exposes `OriginalRow`, `OriginalColumn`, `CurrentRow`, `CurrentColumn`, and `Color`.
-- The visual binder maps LargePatternVisual regions using `OriginalRow` and `OriginalColumn`.
+- Region fallback maps LargePatternVisual regions using `OriginalRow` and `OriginalColumn`.
 - Ghost effects and current-position visuals use `CurrentRow` and `CurrentColumn`.
 
 Verification consequences:
 
-- Visual regions are not repeatedly mapped to the same runtime position.
+- Visual regions are not repeatedly mapped to the same runtime position in Region fallback.
+- PaletteTarget removal aligns user-visible disappearance with image palette groups.
 - WIN hides all remaining LargePatternVisual pixels.
 - Restart restores all LargePatternVisual pixels.
 - RuntimeInvariantValidator remains active and clean.
@@ -294,9 +322,61 @@ Scaling warnings:
 
 ---
 
+## 3.1 Image-to-LargePatternVisualConfig workflow
+
+Menu path:
+
+```text
+Tools / Eliminate Game / Visual / Generate Large Pattern From Image
+```
+
+Generated / updated assets:
+
+```text
+Assets/GameConfigs/Visual/LargePatternVisual_30x28_FromImage.asset
+Assets/GameConfigs/Visual/LargePatternVisual_30x28_FromImage_ColorMapping.asset
+```
+
+Current output data:
+
+- `width = 30`
+- `height = 28`
+- `cellSize`
+- `paletteColors`
+- `cellPaletteIndices`
+- top-to-bottom image data orientation
+- visual-only color mapping asset
+
+Important:
+- The generated visual config is not a level `GameConfig`.
+- The generated visual config does not need Editor Validation as a gameplay level.
+- The active gameplay `GameConfig` still needs Editor Validation if edited.
+- Replacing visual config does not change gameplay solvability.
+
+---
+
+## 3.2 GameplayColorVisualMapping workflow
+
+`GameplayColorVisualMapping` is visual-only.
+
+It can be used by:
+- SelectionArea display color
+- TempZone display color
+- LargePatternVisual PaletteTarget removal
+
+Rules:
+- Do not change tile internal `BlockColor`.
+- Do not change TempZone slot internal `Color`.
+- Do not change Pattern logical color.
+- Do not expand gameplay BlockColor to 16 colors for visual purposes.
+- Do not include mapping palette colors in PatternCount.
+- Do not include mapping palette colors in RuntimeInvariantValidator.
+
+---
+
 ## 4. Three-layer structure
 
-Every authored level must respect the current three-layer gameplay structure.
+Every authored gameplay level must respect the current three-layer gameplay structure.
 
 Top layer:
 
@@ -318,9 +398,11 @@ SelectionArea
 
 ### Pattern
 
-`Pattern` is the target area.
+`Pattern` is the gameplay target area.
 
-It displays the blocks that must be removed for the player to win. It is not an input source. The player does not click Pattern cells directly.
+It contains the logical blocks that must be removed for the player to win. It is not an input source. The player does not click Pattern cells directly.
+
+Pattern visual can be hidden for presentation, but the Pattern logical grid must remain active.
 
 ### TempZone
 
@@ -336,11 +418,15 @@ It stores clicked SelectionArea tiles as progress slots. A TempZone slot can sho
 
 When the slot reaches `3/3`, that slot is complete and is removed.
 
+TempZone visual color can be mapped for presentation only.
+
 ### SelectionArea
 
 `SelectionArea` is the only player input source.
 
 The player clicks available SelectionArea tiles. Those tiles enter TempZone and may trigger Pattern resolve.
+
+SelectionArea visual color can be mapped for presentation only.
 
 ---
 
@@ -387,13 +473,13 @@ Resolve execution:
 5. Pattern applies collapse.
 6. Auto resolve continues with the same rule while a TempZone color can match the current Pattern bottom row.
 
-Do not replace this formula with another rule while authoring levels.
+Do not replace this formula with another rule while authoring levels or visual systems.
 
 ---
 
 ## 6. Required invariant
 
-Every authored level must preserve the runtime invariant for each color.
+Every authored gameplay level must preserve the runtime invariant for each gameplay color.
 
 Formula:
 
@@ -411,9 +497,9 @@ sum(3 - TempZoneSlot.ProgressMark for same color)
 
 Meaning:
 
-- `PatternRemaining[color]` is the number of remaining Pattern cells of that color.
-- `SelectionRemaining[color]` is the number of remaining SelectionArea tiles of that color.
-- `TempDebt[color]` is the unfinished resolve debt currently stored in TempZone slots of that color.
+- `PatternRemaining[color]` is the number of remaining Pattern cells of that gameplay color.
+- `SelectionRemaining[color]` is the number of remaining SelectionArea tiles of that gameplay color.
+- `TempDebt[color]` is the unfinished resolve debt currently stored in TempZone slots of that gameplay color.
 - A TempZone slot with progress `0/3` contributes `3` debt.
 - A TempZone slot with progress `1/3` contributes `2` debt.
 - A TempZone slot with progress `2/3` contributes `1` debt.
@@ -428,6 +514,8 @@ This count rule is necessary, but not sufficient. The level must also be playabl
 
 `RuntimeInvariantValidator` must remain active during valid gameplay. Do not disable it to make level data appear valid.
 
+LargePatternVisual palette data is excluded from this invariant.
+
 ---
 
 ## 7. SelectionArea authoring rules
@@ -440,7 +528,7 @@ Authoring rules:
 - Pattern cells are not clickable.
 - TempZone slots are not clickable.
 - At least one initial unlocked tile is required.
-- The initial unlocked tile must be a real tile with a non-empty color.
+- The initial unlocked tile must be a real tile with a non-empty gameplay color.
 - Unlocking is orthogonal only.
 - Orthogonal neighbors are:
   - up
@@ -452,9 +540,9 @@ Authoring rules:
 
 When a player clicks an unlocked SelectionArea tile, only the orthogonal neighbors of that tile may become unlocked. A tile touching only by a corner must not unlock from that click.
 
-Authoring warning:
-
-A level can have correct total color counts and still fail if the required colors are locked behind an unreachable SelectionArea order. Always validate and play test after editing.
+Presentation rule:
+- SelectionArea display color can differ from internal gameplay `BlockColor` through `GameplayColorVisualMapping`.
+- This must remain visual-only.
 
 ---
 
@@ -476,11 +564,16 @@ Authoring rules:
 
 After a resolve removes Pattern cells, remaining cells fall within their original columns. If collapse changes the occupied Pattern shape, it must still respect the existing runtime collapse behavior. Level data must adapt to the current Pattern semantics, not the other way around.
 
+Presentation rule:
+- Pattern visual can be hidden.
+- Pattern logical grid must remain active.
+- Pattern removed-cell events must continue.
+
 ---
 
 ## 9. Editor Validation workflow
 
-Run validation every time any `GameConfig` is edited.
+Run validation every time any gameplay `GameConfig` is edited.
 
 Required Editor Validation workflow:
 
@@ -503,6 +596,8 @@ A PASS is required before Play testing.
 
 Validation is read-only. It reports invalid authored data; it does not rewrite the level for you.
 
+Visual config regeneration does not replace gameplay Editor Validation if gameplay `GameConfig` was edited.
+
 ---
 
 ## 10. Play test workflow
@@ -524,6 +619,13 @@ Console red errors = 0
 ```
 
 Only commit after Editor Validation passes, Play Mode reaches WIN, and Console red errors equal 0.
+
+For visual-only changes, also confirm:
+- LargePatternVisual displays correctly.
+- SelectionArea display colors remain mapped if mapping is expected.
+- TempZone display colors remain mapped if mapping is expected.
+- LargePatternVisual hides on clicks and fully hides on WIN.
+- LargePatternVisual restores on Restart.
 
 ---
 
@@ -559,21 +661,21 @@ Use this naming format for future level assets only after they are actually crea
 Level_###_GameConfig.asset
 ```
 
-Examples of the naming pattern:
-
-```text
-Level_001_GameConfig.asset
-```
-
 Rules:
 
 - Use three-digit level numbers.
 - Keep the `Level_` prefix.
 - Keep the `_GameConfig.asset` suffix.
 - Do not use ambiguous names such as `NewGameConfig.asset`, `Test.asset`, or `Final.asset` for committed level content.
-- `Level_002_GameConfig.asset` exists and has been verified by the user as the first small safe prototype.
-- `Level_003_GameConfig.asset` exists and has been verified by the user as the second small safe prototype.
 - Do not claim any later level asset exists unless that file has actually been created and verified.
+
+Visual configs are stored separately under:
+
+```text
+Assets/GameConfigs/Visual/
+```
+
+Visual configs are not gameplay levels.
 
 ---
 
@@ -581,7 +683,7 @@ Rules:
 
 Level authoring must stay data-only unless a separate engineering task explicitly changes gameplay rules.
 
-Do not do any of the following while authoring levels:
+Do not do any of the following while authoring levels or visual presentation:
 
 - Do not add hidden auto-fix behavior.
 - Do not rely on hidden auto-fix behavior.
@@ -603,7 +705,7 @@ Do not do any of the following while authoring levels:
 - Do not add diagonal unlock.
 - Do not add cross-column Pattern movement.
 - Do not mutate runtime rules to make one level pass.
-- Do not create oversized levels yet.
+- Do not create oversized gameplay levels yet.
 - Do not exceed Pattern non-None cells <= 45.
 - Do not exceed SelectionArea tiles <= 15.
 - Do not claim `Level_002` or `Level_003` is large-level support or a new large-level baseline.
@@ -615,4 +717,68 @@ Do not do any of the following while authoring levels:
 - Do not claim multi-level progression exists.
 - Do not claim procedural generation exists.
 
-The level must fit the stable rules. The stable rules must not be changed to fit the level. Large-level support is still not production-ready. Resolve-chain budget, log throttling, deterministic validation search budget, and performance caps still need further testing before scaling up. Random-looking mixed layouts can still explode deterministic solvability search complexity. For now, level growth must remain gradual and validation-budget-friendly.
+---
+
+## 13. Current visual-only content workflow
+
+Use this workflow for visual-only LargePatternVisual content:
+
+1. Keep the gameplay `GameConfig` unchanged unless the task is explicitly a level-authoring task.
+2. Open the image generator:
+
+```text
+Tools / Eliminate Game / Visual / Generate Large Pattern From Image
+```
+
+3. Generate / update:
+
+```text
+Assets/GameConfigs/Visual/LargePatternVisual_30x28_FromImage.asset
+Assets/GameConfigs/Visual/LargePatternVisual_30x28_FromImage_ColorMapping.asset
+```
+
+4. Confirm SampleScene references the generated visual config and mapping.
+5. Enter Play Mode.
+6. Confirm:
+   - LargePatternVisual displays with correct orientation.
+   - SelectionArea display colors align with mapping.
+   - TempZone display colors align with mapping.
+   - Clicking SelectionArea progresses gameplay.
+   - LargePatternVisual uses PaletteTarget visual removal.
+   - WIN hides all visual cells.
+   - Restart restores all visual cells.
+   - Console red errors = 0.
+
+Important:
+- This workflow is visual-only.
+- It does not validate or change gameplay solvability.
+- It does not replace Editor Validation for gameplay level edits.
+
+---
+
+## 14. Current stage closure
+
+Current stage is closed as:
+
+```text
+Visual-only large pixel presentation pipeline verified.
+Gameplay remains small-pattern driven.
+30x28 remains presentation layer only.
+```
+
+Recommended next milestone:
+
+```text
+Visual Polish 1.0
+```
+
+Do not use next milestone to enlarge gameplay Pattern.
+
+Suggested Visual Polish scope:
+- background visual polish
+- LargePatternVisual scale / position polish
+- SelectionArea layout polish
+- TempZone layout polish
+- visual cell fade / scale animation
+- UI polish
+- better source image preprocessing guidance
