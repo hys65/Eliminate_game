@@ -80,6 +80,11 @@ namespace EliminateGame.Visual
         }
 
 
+        public bool IsCellVisible(int x, int y)
+        {
+            return visualCellLookup.TryGetValue(new Vector2Int(x, y), out SpriteRenderer renderer) && renderer != null && renderer.enabled;
+        }
+
         public void HideCell(int x, int y)
         {
             if (visualCellLookup.TryGetValue(new Vector2Int(x, y), out SpriteRenderer renderer) && renderer != null)

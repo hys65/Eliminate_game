@@ -16,6 +16,7 @@ namespace EliminateGame.Pattern
         [SerializeField, Min(0.01f)] private float visualScale = 0.95f;
         [SerializeField] private int sortingOrderBase = 300;
         [SerializeField, Min(1)] private int sortingOrderRowStride = 20;
+        [SerializeField] private bool showGameplayPatternVisual = false;
 
         [Header("Pattern Fall Animation")]
         [SerializeField, Min(0.15f)] private float fallDuration = 0.2f;
@@ -618,6 +619,7 @@ namespace EliminateGame.Pattern
 
             renderer.drawMode = SpriteDrawMode.Simple;
             renderer.color = MapColor(color);
+            renderer.enabled = showGameplayPatternVisual;
 
             return renderer;
         }
@@ -745,6 +747,38 @@ namespace EliminateGame.Pattern
                     return new Color(0.6f, 0.2f, 0.8f);
                 default:
                     return Color.white;
+            }
+        }
+
+        private void OnValidate()
+        {
+            ApplyGameplayPatternVisualVisibility();
+        }
+
+        private void ApplyGameplayPatternVisualVisibility()
+        {
+            for (int i = 0; i < tileVisuals.Count; i++)
+            {
+                TileVisualEntry entry = tileVisuals[i];
+                if (entry != null && entry.Renderer != null)
+                {
+                    entry.Renderer.enabled = showGameplayPatternVisual;
+                }
+            }
+
+            Transform root = GetTileRoot();
+            if (root == null)
+            {
+                return;
+            }
+
+            SpriteRenderer[] renderers = root.GetComponentsInChildren<SpriteRenderer>(true);
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                if (renderers[i] != null)
+                {
+                    renderers[i].enabled = showGameplayPatternVisual;
+                }
             }
         }
 
