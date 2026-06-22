@@ -20,8 +20,10 @@ namespace EliminateGame.Visual
         private static Sprite cachedSolidSquareSprite;
         private sealed class VisualCellState
         {
-            public int X;
-            public int Y;
+            public int DataX;
+            public int DataY;
+            public int RenderX;
+            public int RenderY;
             public int PaletteIndex;
             public SpriteRenderer Renderer;
             public bool IsVisible;
@@ -57,11 +59,11 @@ namespace EliminateGame.Visual
 
             int nonNoneCellCount = 0;
 
-            for (int y = 0; y < visualConfig.Height; y++)
+            for (int dataY = 0; dataY < visualConfig.Height; dataY++)
             {
-                for (int x = 0; x < visualConfig.Width; x++)
+                for (int dataX = 0; dataX < visualConfig.Width; dataX++)
                 {
-                    if (!TryGetVisualCellColor(x, y, out Color visualColor, out int paletteIndex))
+                    if (!TryGetVisualCellColor(dataX, dataY, out Color visualColor, out int paletteIndex))
                     {
                         continue;
                     }
@@ -73,25 +75,30 @@ namespace EliminateGame.Visual
                         continue;
                     }
 
+                    int renderX = dataX;
+                    int renderY = ConvertDataYToRenderRow(dataY);
+
                     Transform cellTransform = renderer.transform;
-                    float localX = (x * step) - xOffset;
-                    float localY = yOffset - (y * step);
+                    float localX = (renderX * step) - xOffset;
+                    float localY = yOffset - (renderY * step);
                     cellTransform.localPosition = new Vector3(localX, localY, 0f);
                     cellTransform.localRotation = Quaternion.identity;
                     cellTransform.localScale = GetCompensatedCellScale(cellTransform.parent, visualConfig.CellSize);
-                    renderer.sortingOrder = sortingOrderBase + ((visualConfig.Height - 1 - y) * visualConfig.Width) + x;
+                    renderer.sortingOrder = sortingOrderBase + ((visualConfig.Height - 1 - renderY) * visualConfig.Width) + renderX;
 
                     VisualCellState state = new VisualCellState
                     {
-                        X = x,
-                        Y = y,
+                        DataX = dataX,
+                        DataY = dataY,
+                        RenderX = renderX,
+                        RenderY = renderY,
                         PaletteIndex = paletteIndex,
                         Renderer = renderer,
                         IsVisible = true
                     };
                     visualCells.Add(renderer);
                     visualCellStates.Add(state);
-                    visualCellLookup[new Vector2Int(x, y)] = state;
+                    visualCellLookup[new Vector2Int(dataX, dataY)] = state;
                 }
             }
 
@@ -239,6 +246,14 @@ namespace EliminateGame.Visual
                     DestroySafe(child.gameObject);
                 }
             }
+        }
+
+        private int ConvertDataYToRenderRow(int dataY)
+        {
+            // Existing generated LargePatternVisualConfig assets store Texture2D rows in Unity's
+            // bottom-to-top texture coordinate order. The visual grid renders rows top-to-bottom,
+            // so convert data Y into the render row here instead of requiring assets to regenerate.
+            return visualConfig.Height - 1 - dataY;
         }
 
         private bool TryGetVisualCellColor(int x, int y, out Color visualColor, out int paletteIndex)
@@ -395,7 +410,7 @@ namespace EliminateGame.Visual
         {
             if (preferBottomToTop)
             {
-                int yCompare = right.Y.CompareTo(left.Y);
+                int yCompare = right.RenderY.CompareTo(left.RenderY);
                 if (yCompare != 0)
                 {
                     return yCompare;
@@ -408,8 +423,8 @@ namespace EliminateGame.Visual
                 return hashCompare;
             }
 
-            int yFallback = left.Y.CompareTo(right.Y);
-            return yFallback != 0 ? yFallback : left.X.CompareTo(right.X);
+            int yFallback = left.RenderY.CompareTo(right.RenderY);
+            return yFallback != 0 ? yFallback : left.RenderX.CompareTo(right.RenderX);
         }
 
         private static int GetDeterministicCellHash(VisualCellState state, int seed)
@@ -417,8 +432,8 @@ namespace EliminateGame.Visual
             unchecked
             {
                 int hash = seed;
-                hash = (hash * 397) ^ state.X;
-                hash = (hash * 397) ^ state.Y;
+                hash = (hash * 397) ^ state.DataX;
+                hash = (hash * 397) ^ state.DataY;
                 hash = (hash * 397) ^ state.PaletteIndex;
                 return hash & int.MaxValue;
             }
