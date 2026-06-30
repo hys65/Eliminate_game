@@ -20,7 +20,7 @@ namespace EliminateGame.Visual
         [SerializeField] private bool buildOnStart = true;
 
         [Header("Visual polish")]
-        [SerializeField] private bool backgroundEnabled = true;
+        [SerializeField] private bool backgroundEnabled = false;
         [SerializeField] private Color backgroundColor = new Color(0.96f, 0.92f, 0.84f, 1f);
         [SerializeField, Min(0f)] private float backgroundPadding = 0.2f;
         [SerializeField] private bool hideAnimationEnabled = true;
@@ -180,6 +180,51 @@ namespace EliminateGame.Visual
             return hideCount;
         }
 
+        public int HideCellsByPaletteIndicesInRegion(
+            IReadOnlyCollection<int> paletteIndices,
+            int maxCount,
+            int deterministicSeed,
+            int startX,
+            int endX,
+            int startY,
+            int endY,
+            bool preferBottomToTop = false)
+        {
+            if (paletteIndices == null || paletteIndices.Count == 0 || maxCount <= 0 || visualConfig == null)
+            {
+                return 0;
+            }
+
+            ClampRegionToVisualConfig(ref startX, ref endX, ref startY, ref endY);
+
+            HashSet<int> targetIndices = new HashSet<int>(paletteIndices);
+            List<VisualCellState> candidates = new List<VisualCellState>();
+            for (int i = 0; i < visualCellStates.Count; i++)
+            {
+                VisualCellState state = visualCellStates[i];
+                if (state != null
+                    && state.IsVisible
+                    && state.Renderer != null
+                    && state.DataX >= startX
+                    && state.DataX <= endX
+                    && state.DataY >= startY
+                    && state.DataY <= endY
+                    && targetIndices.Contains(state.PaletteIndex))
+                {
+                    candidates.Add(state);
+                }
+            }
+
+            candidates.Sort((left, right) => CompareDeterministicCellOrder(left, right, deterministicSeed, preferBottomToTop));
+            int hideCount = Mathf.Min(maxCount, candidates.Count);
+            for (int i = 0; i < hideCount; i++)
+            {
+                HideState(candidates[i]);
+            }
+
+            return hideCount;
+        }
+
         public int HideAnyVisibleCells(int maxCount, int deterministicSeed, bool preferBottomToTop = false)
         {
             if (maxCount <= 0)
@@ -192,6 +237,48 @@ namespace EliminateGame.Visual
             {
                 VisualCellState state = visualCellStates[i];
                 if (state != null && state.IsVisible && state.Renderer != null)
+                {
+                    candidates.Add(state);
+                }
+            }
+
+            candidates.Sort((left, right) => CompareDeterministicCellOrder(left, right, deterministicSeed, preferBottomToTop));
+            int hideCount = Mathf.Min(maxCount, candidates.Count);
+            for (int i = 0; i < hideCount; i++)
+            {
+                HideState(candidates[i]);
+            }
+
+            return hideCount;
+        }
+
+        public int HideAnyVisibleCellsInRegion(
+            int maxCount,
+            int deterministicSeed,
+            int startX,
+            int endX,
+            int startY,
+            int endY,
+            bool preferBottomToTop = false)
+        {
+            if (maxCount <= 0 || visualConfig == null)
+            {
+                return 0;
+            }
+
+            ClampRegionToVisualConfig(ref startX, ref endX, ref startY, ref endY);
+
+            List<VisualCellState> candidates = new List<VisualCellState>();
+            for (int i = 0; i < visualCellStates.Count; i++)
+            {
+                VisualCellState state = visualCellStates[i];
+                if (state != null
+                    && state.IsVisible
+                    && state.Renderer != null
+                    && state.DataX >= startX
+                    && state.DataX <= endX
+                    && state.DataY >= startY
+                    && state.DataY <= endY)
                 {
                     candidates.Add(state);
                 }
@@ -564,6 +651,19 @@ namespace EliminateGame.Visual
 
             int yFallback = left.RenderY.CompareTo(right.RenderY);
             return yFallback != 0 ? yFallback : left.RenderX.CompareTo(right.RenderX);
+        }
+
+        private void ClampRegionToVisualConfig(ref int startX, ref int endX, ref int startY, ref int endY)
+        {
+            int minX = Mathf.Min(startX, endX);
+            int maxX = Mathf.Max(startX, endX);
+            int minY = Mathf.Min(startY, endY);
+            int maxY = Mathf.Max(startY, endY);
+
+            startX = Mathf.Clamp(minX, 0, visualConfig.Width - 1);
+            endX = Mathf.Clamp(maxX, 0, visualConfig.Width - 1);
+            startY = Mathf.Clamp(minY, 0, visualConfig.Height - 1);
+            endY = Mathf.Clamp(maxY, 0, visualConfig.Height - 1);
         }
 
         private static int GetDeterministicCellHash(VisualCellState state, int seed)
