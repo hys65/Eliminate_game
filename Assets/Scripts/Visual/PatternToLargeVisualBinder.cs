@@ -9,9 +9,10 @@ namespace EliminateGame.Visual
     {
         private enum LargeVisualRemovalMode
         {
-            Region,
-            PaletteTarget,
-            LocalRegionPalette
+            Region = 0,
+            PaletteTarget = 1,
+            LocalRegionPalette = 2,
+            LocalRegionFullDissolve = 3
         }
 
         [Header("Controllers")]
@@ -31,7 +32,7 @@ namespace EliminateGame.Visual
         [SerializeField] private bool bindOnStart = true;
 
         [Header("Visual-only removal pacing")]
-        [SerializeField] private LargeVisualRemovalMode removalMode = LargeVisualRemovalMode.LocalRegionPalette;
+        [SerializeField] private LargeVisualRemovalMode removalMode = LargeVisualRemovalMode.LocalRegionFullDissolve;
         [SerializeField, Min(1)] private int cellsToHidePerGameplayCell = 3;
         [SerializeField] private bool preferBottomToTop = false;
         [SerializeField] private int deterministicHideSeed = 12345;
@@ -140,7 +141,34 @@ namespace EliminateGame.Visual
                 return;
             }
 
+            if (removalMode == LargeVisualRemovalMode.LocalRegionFullDissolve)
+            {
+                HideLocalRegionsFully(removedCells);
+                return;
+            }
+
             HideMappedRegions(removedCells);
+        }
+
+        private void HideLocalRegionsFully(IReadOnlyList<PatternRemovedCell> removedCells)
+        {
+            if (removedCells == null || removedCells.Count <= 0)
+            {
+                return;
+            }
+
+            for (int i = 0; i < removedCells.Count; i++)
+            {
+                PatternRemovedCell removedCell = removedCells[i];
+                GetMappedRegion(removedCell, out int startX, out int endX, out int startY, out int endY);
+                largeVisualController.HideAllVisibleCellsInRegion(
+                    deterministicHideSeed + i,
+                    startX,
+                    endX,
+                    startY,
+                    endY,
+                    preferBottomToTop);
+            }
         }
 
         private void HideLocalRegionPaletteTargetsOrFallback(IReadOnlyList<PatternRemovedCell> removedCells)

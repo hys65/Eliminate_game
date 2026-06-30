@@ -294,6 +294,46 @@ namespace EliminateGame.Visual
             return hideCount;
         }
 
+        public int HideAllVisibleCellsInRegion(
+            int deterministicSeed,
+            int startX,
+            int endX,
+            int startY,
+            int endY,
+            bool preferBottomToTop = false)
+        {
+            if (visualConfig == null)
+            {
+                return 0;
+            }
+
+            ClampRegionToVisualConfig(ref startX, ref endX, ref startY, ref endY);
+
+            List<VisualCellState> candidates = new List<VisualCellState>();
+            for (int i = 0; i < visualCellStates.Count; i++)
+            {
+                VisualCellState state = visualCellStates[i];
+                if (state != null
+                    && state.IsVisible
+                    && state.Renderer != null
+                    && state.DataX >= startX
+                    && state.DataX <= endX
+                    && state.DataY >= startY
+                    && state.DataY <= endY)
+                {
+                    candidates.Add(state);
+                }
+            }
+
+            candidates.Sort((left, right) => CompareDeterministicCellOrder(left, right, deterministicSeed, preferBottomToTop));
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                HideState(candidates[i]);
+            }
+
+            return candidates.Count;
+        }
+
         public void ResetVisualState()
         {
             for (int i = 0; i < visualCellStates.Count; i++)
