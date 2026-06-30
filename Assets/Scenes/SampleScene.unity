@@ -982,6 +982,12 @@ MonoBehaviour:
   spacing: 0.01
   sortingOrderBase: 500
   buildOnStart: 1
+  backgroundEnabled: 1
+  backgroundColor: {r: 0.96, g: 0.92, b: 0.84, a: 1}
+  backgroundPadding: 0.2
+  hideAnimationEnabled: 1
+  hideAnimationDuration: 0.12
+  hideAnimationEndScaleMultiplier: 0.65
 --- !u!114 &2000000003
 MonoBehaviour:
   m_ObjectHideFlags: 0
