@@ -1008,8 +1008,8 @@ MonoBehaviour:
   visualWidth: 30
   visualHeight: 28
   bindOnStart: 1
-  removalMode: 3
-  cellsToHidePerGameplayCell: 3
+  removalMode: 0
+  cellsToHidePerGameplayCell: 1
   preferBottomToTop: 0
   deterministicHideSeed: 12345
 --- !u!1660057539 &9223372036854775807
