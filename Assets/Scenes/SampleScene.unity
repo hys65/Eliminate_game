@@ -986,7 +986,7 @@ MonoBehaviour:
   backgroundColor: {r: 0.96, g: 0.92, b: 0.84, a: 1}
   backgroundPadding: 0.2
   hideAnimationEnabled: 1
-  hideAnimationDuration: 0.1
+  hideAnimationDuration: 0.08
   hideAnimationEndScaleMultiplier: 0.75
 --- !u!114 &2000000003
 MonoBehaviour:
@@ -1008,7 +1008,7 @@ MonoBehaviour:
   visualWidth: 30
   visualHeight: 28
   bindOnStart: 1
-  removalMode: 2
+  removalMode: 3
   cellsToHidePerGameplayCell: 3
   preferBottomToTop: 0
   deterministicHideSeed: 12345
