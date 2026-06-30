@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using EliminateGame.Pattern;
 using UnityEngine;
@@ -8,6 +9,7 @@ namespace EliminateGame.Visual
     public class LargePatternVisualController : MonoBehaviour
     {
         private const string VisualCellName = "LargePatternVisualCell";
+        private const string BackgroundName = "LargePatternVisualBackground";
 
         [Header("Visual-only config")]
         [SerializeField] private LargePatternVisualConfig visualConfig;
@@ -16,6 +18,14 @@ namespace EliminateGame.Visual
         [SerializeField, Min(0f)] private float spacing = 0.01f;
         [SerializeField] private int sortingOrderBase = 500;
         [SerializeField] private bool buildOnStart = true;
+
+        [Header("Visual polish")]
+        [SerializeField] private bool backgroundEnabled = true;
+        [SerializeField] private Color backgroundColor = new Color(0.96f, 0.92f, 0.84f, 1f);
+        [SerializeField, Min(0f)] private float backgroundPadding = 0.2f;
+        [SerializeField] private bool hideAnimationEnabled = true;
+        [SerializeField, Min(0.01f)] private float hideAnimationDuration = 0.12f;
+        [SerializeField, Range(0f, 1f)] private float hideAnimationEndScaleMultiplier = 0.65f;
 
         private static Sprite cachedSolidSquareSprite;
         private sealed class VisualCellState
@@ -27,11 +37,15 @@ namespace EliminateGame.Visual
             public int PaletteIndex;
             public SpriteRenderer Renderer;
             public bool IsVisible;
+            public Color OriginalColor;
+            public Vector3 OriginalScale;
+            public Coroutine HideCoroutine;
         }
 
         private readonly List<SpriteRenderer> visualCells = new List<SpriteRenderer>();
         private readonly List<VisualCellState> visualCellStates = new List<VisualCellState>();
         private readonly Dictionary<Vector2Int, VisualCellState> visualCellLookup = new Dictionary<Vector2Int, VisualCellState>();
+        private SpriteRenderer backgroundRenderer;
 
         private void Start()
         {
@@ -94,13 +108,17 @@ namespace EliminateGame.Visual
                         RenderY = renderY,
                         PaletteIndex = paletteIndex,
                         Renderer = renderer,
-                        IsVisible = true
+                        IsVisible = true,
+                        OriginalColor = renderer.color,
+                        OriginalScale = cellTransform.localScale
                     };
                     visualCells.Add(renderer);
                     visualCellStates.Add(state);
                     visualCellLookup[new Vector2Int(dataX, dataY)] = state;
                 }
             }
+
+            EnsureBackground(root, step, xOffset, yOffset);
 
             Debug.Log($"[LargePatternVisual] Built visual grid Width={visualConfig.Width} Height={visualConfig.Height} NonNoneCells={nonNoneCellCount}", this);
         }
@@ -113,11 +131,12 @@ namespace EliminateGame.Visual
 
         public void HideCell(int x, int y)
         {
-            if (visualCellLookup.TryGetValue(new Vector2Int(x, y), out VisualCellState state) && state != null && state.Renderer != null)
+            if (!visualCellLookup.TryGetValue(new Vector2Int(x, y), out VisualCellState state))
             {
-                state.Renderer.enabled = false;
-                state.IsVisible = false;
+                return;
             }
+
+            HideState(state);
         }
 
         public void HideCells(IEnumerable<Vector2Int> coordinates)
@@ -155,8 +174,7 @@ namespace EliminateGame.Visual
             int hideCount = Mathf.Min(maxCount, candidates.Count);
             for (int i = 0; i < hideCount; i++)
             {
-                candidates[i].Renderer.enabled = false;
-                candidates[i].IsVisible = false;
+                HideState(candidates[i]);
             }
 
             return hideCount;
@@ -183,8 +201,7 @@ namespace EliminateGame.Visual
             int hideCount = Mathf.Min(maxCount, candidates.Count);
             for (int i = 0; i < hideCount; i++)
             {
-                candidates[i].Renderer.enabled = false;
-                candidates[i].IsVisible = false;
+                HideState(candidates[i]);
             }
 
             return hideCount;
@@ -192,33 +209,64 @@ namespace EliminateGame.Visual
 
         public void ResetVisualState()
         {
-            SetAllVisualCellsEnabled(true);
+            for (int i = 0; i < visualCellStates.Count; i++)
+            {
+                VisualCellState state = visualCellStates[i];
+                if (state == null)
+                {
+                    continue;
+                }
+
+                StopHideCoroutine(state);
+                state.IsVisible = true;
+                if (state.Renderer != null)
+                {
+                    state.Renderer.enabled = true;
+                    state.Renderer.color = state.OriginalColor;
+                    state.Renderer.transform.localScale = state.OriginalScale;
+                }
+            }
+
+            if (backgroundEnabled && backgroundRenderer != null)
+            {
+                backgroundRenderer.enabled = true;
+            }
         }
 
         public void HideAllCells()
         {
-            SetAllVisualCellsEnabled(false);
-        }
-
-        private void SetAllVisualCellsEnabled(bool enabled)
-        {
             for (int i = 0; i < visualCellStates.Count; i++)
             {
                 VisualCellState state = visualCellStates[i];
-                if (state != null)
+                if (state == null)
                 {
-                    state.IsVisible = enabled;
-                    if (state.Renderer != null)
-                    {
-                        state.Renderer.enabled = enabled;
-                    }
+                    continue;
                 }
+
+                StopHideCoroutine(state);
+                state.IsVisible = false;
+                if (state.Renderer != null)
+                {
+                    state.Renderer.enabled = false;
+                    state.Renderer.color = state.OriginalColor;
+                    state.Renderer.transform.localScale = state.OriginalScale;
+                }
+            }
+
+            if (backgroundRenderer != null)
+            {
+                backgroundRenderer.enabled = false;
             }
         }
 
         [ContextMenu("Clear Visual Grid")]
         public void ClearVisualGrid()
         {
+            for (int i = 0; i < visualCellStates.Count; i++)
+            {
+                StopHideCoroutine(visualCellStates[i]);
+            }
+
             for (int i = 0; i < visualCells.Count; i++)
             {
                 SpriteRenderer renderer = visualCells[i];
@@ -231,6 +279,7 @@ namespace EliminateGame.Visual
             visualCells.Clear();
             visualCellStates.Clear();
             visualCellLookup.Clear();
+            backgroundRenderer = null;
 
             Transform root = GetTileRoot();
             if (root == null)
@@ -241,11 +290,96 @@ namespace EliminateGame.Visual
             for (int i = root.childCount - 1; i >= 0; i--)
             {
                 Transform child = root.GetChild(i);
-                if (child != null && child.name == VisualCellName)
+                if (child != null && (child.name == VisualCellName || child.name == BackgroundName))
                 {
                     DestroySafe(child.gameObject);
                 }
             }
+        }
+
+        private void EnsureBackground(Transform root, float step, float xOffset, float yOffset)
+        {
+            backgroundRenderer = null;
+            if (!backgroundEnabled || root == null || visualConfig == null)
+            {
+                return;
+            }
+
+            GameObject backgroundObject = new GameObject(BackgroundName);
+            backgroundObject.transform.SetParent(root, false);
+            backgroundObject.transform.localPosition = new Vector3(0f, 0f, 0.1f);
+            backgroundObject.transform.localRotation = Quaternion.identity;
+
+            backgroundRenderer = backgroundObject.AddComponent<SpriteRenderer>();
+            backgroundRenderer.sprite = GetSolidSquareSprite();
+            backgroundRenderer.drawMode = SpriteDrawMode.Simple;
+            backgroundRenderer.color = backgroundColor;
+            backgroundRenderer.sortingOrder = sortingOrderBase - 10;
+
+            float width = (visualConfig.Width * visualConfig.CellSize) + ((visualConfig.Width - 1) * spacing) + (backgroundPadding * 2f);
+            float height = (visualConfig.Height * visualConfig.CellSize) + ((visualConfig.Height - 1) * spacing) + (backgroundPadding * 2f);
+            backgroundObject.transform.localScale = GetCompensatedSizeScale(backgroundObject.transform.parent, width, height);
+        }
+
+        private void HideState(VisualCellState state)
+        {
+            if (state == null || state.Renderer == null || !state.IsVisible)
+            {
+                return;
+            }
+
+            state.IsVisible = false;
+            StopHideCoroutine(state);
+            if (!hideAnimationEnabled || !Application.isPlaying)
+            {
+                state.Renderer.enabled = false;
+                return;
+            }
+
+            state.HideCoroutine = StartCoroutine(PlayHideAnimation(state));
+        }
+
+        private IEnumerator PlayHideAnimation(VisualCellState state)
+        {
+            if (state == null || state.Renderer == null)
+            {
+                yield break;
+            }
+
+            SpriteRenderer renderer = state.Renderer;
+            Color startColor = state.OriginalColor;
+            Vector3 startScale = state.OriginalScale;
+            Vector3 endScale = startScale * hideAnimationEndScaleMultiplier;
+            float duration = Mathf.Max(0.01f, hideAnimationDuration);
+            float elapsed = 0f;
+
+            renderer.enabled = true;
+            while (elapsed < duration)
+            {
+                float t = elapsed / duration;
+                Color animatedColor = startColor;
+                animatedColor.a = Mathf.Lerp(startColor.a, 0f, t);
+                renderer.color = animatedColor;
+                renderer.transform.localScale = Vector3.Lerp(startScale, endScale, t);
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+
+            renderer.enabled = false;
+            renderer.color = state.OriginalColor;
+            renderer.transform.localScale = state.OriginalScale;
+            state.HideCoroutine = null;
+        }
+
+        private void StopHideCoroutine(VisualCellState state)
+        {
+            if (state == null || state.HideCoroutine == null)
+            {
+                return;
+            }
+
+            StopCoroutine(state.HideCoroutine);
+            state.HideCoroutine = null;
         }
 
         private int ConvertDataYToRenderRow(int dataY)
@@ -376,9 +510,14 @@ namespace EliminateGame.Visual
 
         private static Vector3 GetCompensatedCellScale(Transform parent, float cellSize)
         {
+            return GetCompensatedSizeScale(parent, cellSize, cellSize);
+        }
+
+        private static Vector3 GetCompensatedSizeScale(Transform parent, float width, float height)
+        {
             Vector3 parentLossyScale = parent != null ? parent.lossyScale : Vector3.one;
-            float scaleX = SafeDiv(cellSize, parentLossyScale.x);
-            float scaleY = SafeDiv(cellSize, parentLossyScale.y);
+            float scaleX = SafeDiv(width, parentLossyScale.x);
+            float scaleY = SafeDiv(height, parentLossyScale.y);
             return new Vector3(scaleX, scaleY, 1f);
         }
 
