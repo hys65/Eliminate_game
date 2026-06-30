@@ -10,7 +10,8 @@ namespace EliminateGame.Visual
         private enum LargeVisualRemovalMode
         {
             Region,
-            PaletteTarget
+            PaletteTarget,
+            LocalRegionPalette
         }
 
         [Header("Controllers")]
@@ -30,8 +31,8 @@ namespace EliminateGame.Visual
         [SerializeField] private bool bindOnStart = true;
 
         [Header("Visual-only removal pacing")]
-        [SerializeField] private LargeVisualRemovalMode removalMode = LargeVisualRemovalMode.PaletteTarget;
-        [SerializeField, Min(1)] private int cellsToHidePerGameplayCell = 12;
+        [SerializeField] private LargeVisualRemovalMode removalMode = LargeVisualRemovalMode.LocalRegionPalette;
+        [SerializeField, Min(1)] private int cellsToHidePerGameplayCell = 3;
         [SerializeField] private bool preferBottomToTop = false;
         [SerializeField] private int deterministicHideSeed = 12345;
 
@@ -133,7 +134,53 @@ namespace EliminateGame.Visual
                 return;
             }
 
+            if (removalMode == LargeVisualRemovalMode.LocalRegionPalette)
+            {
+                HideLocalRegionPaletteTargetsOrFallback(removedCells);
+                return;
+            }
+
             HideMappedRegions(removedCells);
+        }
+
+        private void HideLocalRegionPaletteTargetsOrFallback(IReadOnlyList<PatternRemovedCell> removedCells)
+        {
+            for (int i = 0; i < removedCells.Count; i++)
+            {
+                PatternRemovedCell removedCell = removedCells[i];
+                GetMappedRegion(removedCell, out int startX, out int endX, out int startY, out int endY);
+
+                int hiddenCount = 0;
+                if (visualMapping != null && visualMapping.TryGetTargetPaletteIndices(removedCell.Color, out IReadOnlyList<int> targetPaletteIndices))
+                {
+                    hiddenCount = largeVisualController.HideCellsByPaletteIndicesInRegion(
+                        targetPaletteIndices,
+                        cellsToHidePerGameplayCell,
+                        deterministicHideSeed + i,
+                        startX,
+                        endX,
+                        startY,
+                        endY,
+                        preferBottomToTop);
+                }
+
+                if (hiddenCount <= 0)
+                {
+                    hiddenCount = largeVisualController.HideAnyVisibleCellsInRegion(
+                        cellsToHidePerGameplayCell,
+                        deterministicHideSeed + i,
+                        startX,
+                        endX,
+                        startY,
+                        endY,
+                        preferBottomToTop);
+                }
+
+                if (hiddenCount <= 0)
+                {
+                    HideMappedRegion(removedCell);
+                }
+            }
         }
 
         private void HidePaletteTargetsOrFallback(IReadOnlyList<PatternRemovedCell> removedCells)
