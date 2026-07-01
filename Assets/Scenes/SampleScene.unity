@@ -198,7 +198,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 10b8a9a41cd7eda49a9b4799e81d26b2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EliminateGame.Core.GameManager
-  gameConfig: {fileID: 11400000, guid: 0baae41cc16648eeaba4fffb56fbbfeb, type: 2}
+  gameConfig: {fileID: 11400000, guid: 6d1dbcf25f85f4b688e07dedec930d43, type: 2}
   levelDatabase: {fileID: 0}
   currentLevelIndex: 0
   patternController: {fileID: 654914619}
