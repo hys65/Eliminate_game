@@ -198,7 +198,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 10b8a9a41cd7eda49a9b4799e81d26b2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EliminateGame.Core.GameManager
-  gameConfig: {fileID: 11400000, guid: 6d1dbcf25f85f4b688e07dedec930d43, type: 2}
+  gameConfig: {fileID: 11400000, guid: 0baae41cc16648eeaba4fffb56fbbfeb, type: 2}
   levelDatabase: {fileID: 0}
   currentLevelIndex: 0
   patternController: {fileID: 654914619}
@@ -738,7 +738,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::EliminateGame.SelectionArea.SelectionAreaGridController
   tilePrefab: {fileID: 8273039707044253858, guid: 691dc1753f17669458999c7f940acacf, type: 3}
   tileRoot: {fileID: 1843886616}
-  spacing: 0.65
+  spacing: 0.7
   visualMapping: {fileID: 11400000, guid: b5ef4e85a64d4b438889cda734290281, type: 2}
 --- !u!1 &1127312059
 GameObject:
