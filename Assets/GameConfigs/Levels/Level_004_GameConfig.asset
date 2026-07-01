@@ -13,11 +13,9 @@ MonoBehaviour:
   m_Name: Level_004_GameConfig
   m_EditorClassIdentifier: Assembly-CSharp::EliminateGame.Data.GameConfig
   patternRows:
-  - Cells: 050000000100000003000000020000000100000003000000040000000200000005000000
-  - Cells: 030000000100000002000000030000000400000001000000030000000500000002000000
-  - Cells: 010000000300000004000000020000000300000001000000050000000300000001000000
-  - Cells: 020000000400000003000000010000000200000003000000010000000400000005000000
-  - Cells: 010000000300000002000000010000000300000004000000020000000500000001000000
+  - Cells: 01000000030000000400000001000000030000000200000003000000010000000200000004000000030000000100000002000000
+  - Cells: 01000000030000000400000001000000030000000200000003000000010000000200000004000000030000000100000002000000
+  - Cells: 01000000030000000400000001000000030000000200000003000000010000000200000004000000030000000100000002000000
   tempZoneCapacity: 7
   selectionWidth: 5
   selectionHeight: 3
@@ -36,11 +34,11 @@ MonoBehaviour:
     StartUnlocked: 1
   - X: 3
     Y: 0
-    Color: 5
+    Color: 1
     StartUnlocked: 1
   - X: 4
     Y: 0
-    Color: 1
+    Color: 3
     StartUnlocked: 1
   - X: 0
     Y: 1
@@ -58,27 +56,19 @@ MonoBehaviour:
     Y: 1
     Color: 2
     StartUnlocked: 0
-  - X: 4
-    Y: 1
-    Color: 3
-    StartUnlocked: 0
   - X: 0
-    Y: 2
-    Color: 5
-    StartUnlocked: 0
-  - X: 1
     Y: 2
     Color: 4
     StartUnlocked: 0
-  - X: 2
+  - X: 1
     Y: 2
     Color: 3
     StartUnlocked: 0
-  - X: 3
+  - X: 2
     Y: 2
     Color: 1
     StartUnlocked: 0
-  - X: 4
+  - X: 3
     Y: 2
     Color: 2
     StartUnlocked: 0
