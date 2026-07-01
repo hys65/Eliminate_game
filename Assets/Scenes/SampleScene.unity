@@ -738,7 +738,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::EliminateGame.SelectionArea.SelectionAreaGridController
   tilePrefab: {fileID: 8273039707044253858, guid: 691dc1753f17669458999c7f940acacf, type: 3}
   tileRoot: {fileID: 1843886616}
-  spacing: 1
+  spacing: 0.95
   visualMapping: {fileID: 11400000, guid: b5ef4e85a64d4b438889cda734290281, type: 2}
 --- !u!1 &1127312059
 GameObject:
@@ -1028,7 +1028,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &2100000001
 Transform:
   m_ObjectHideFlags: 0
