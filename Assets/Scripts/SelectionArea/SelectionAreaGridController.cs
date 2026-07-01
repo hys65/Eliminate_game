@@ -11,7 +11,7 @@ namespace EliminateGame.SelectionArea
     {
         [SerializeField] private SelectionTile tilePrefab;
         [SerializeField] private Transform tileRoot;
-        [SerializeField] private float spacing = 0.95f;
+        [SerializeField] private float spacing = 0.65f;
         [SerializeField] private GameplayColorVisualMapping visualMapping;
 
         private readonly Dictionary<Vector2Int, SelectionTile> tiles = new Dictionary<Vector2Int, SelectionTile>();
