@@ -13,16 +13,12 @@ namespace EliminateGame.SelectionArea
         [SerializeField] private int y;
         [SerializeField] private bool isUnlocked;
         [SerializeField] private GameplayColorVisualMapping visualMapping;
-        [SerializeField, Min(1)] private int visualSubCellCount = 3;
-        [SerializeField, Min(0.05f)] private float visualSubCellSize = 0.28f;
-        [SerializeField, Min(0f)] private float visualSubCellSpacing = 0.04f;
         [SerializeField, Range(0.1f, 1f)] private float lockedBrightnessMultiplier = 0.4f;
         [SerializeField] private int sortingOrderBase = 200;
 
         private static Sprite generatedTileSprite;
         private SpriteRenderer spriteRenderer;
         private BoxCollider2D boxCollider2D;
-        private SpriteRenderer[] visualSubCellRenderers;
 
         public BlockColor Color => color;
         public int X => x;
@@ -47,7 +43,7 @@ namespace EliminateGame.SelectionArea
             color = tileColor;
             visualMapping = mapping;
             IsRemoved = false;
-            transform.localScale = new Vector3(0.95f, 0.95f, 1f);
+            transform.localScale = new Vector3(0.6f, 0.6f, 1f);
 
             SetUnlocked(startUnlocked);
             name = $"SelectionTile_{x}_{y}_{color}";
@@ -125,9 +121,7 @@ namespace EliminateGame.SelectionArea
             }
 
             spriteRenderer.sprite = generatedTileSprite;
-            spriteRenderer.enabled = false;
-
-            EnsureVisualSubCells();
+            spriteRenderer.sortingOrder = sortingOrderBase;
 
             if (boxCollider2D == null)
             {
@@ -148,64 +142,11 @@ namespace EliminateGame.SelectionArea
                 return;
             }
 
-            spriteRenderer.enabled = false;
-            EnsureVisualSubCells();
-
             var fallbackColor = ToUnityColor(color);
             var baseColor = visualMapping != null ? visualMapping.GetDisplayColor(color, fallbackColor) : fallbackColor;
             var displayColor = isUnlocked ? baseColor : ApplyLockedBrightness(baseColor);
-            bool shouldShow = !IsRemoved;
-
-            for (int i = 0; i < visualSubCellRenderers.Length; i++)
-            {
-                SpriteRenderer subCellRenderer = visualSubCellRenderers[i];
-                if (subCellRenderer == null)
-                {
-                    continue;
-                }
-
-                subCellRenderer.enabled = shouldShow;
-                subCellRenderer.color = displayColor;
-            }
-        }
-
-        private void EnsureVisualSubCells()
-        {
-            int safeCount = Mathf.Max(1, visualSubCellCount);
-            if (visualSubCellRenderers == null || visualSubCellRenderers.Length != safeCount)
-            {
-                visualSubCellRenderers = new SpriteRenderer[safeCount];
-            }
-
-            float step = visualSubCellSize + visualSubCellSpacing;
-            float startX = -((safeCount - 1) * step * 0.5f);
-
-            for (int i = 0; i < safeCount; i++)
-            {
-                SpriteRenderer subCellRenderer = visualSubCellRenderers[i];
-                if (subCellRenderer == null)
-                {
-                    Transform existing = transform.Find($"SelectionTileVisualSubCell_{i}");
-                    GameObject subCellObject = existing != null
-                        ? existing.gameObject
-                        : new GameObject($"SelectionTileVisualSubCell_{i}");
-
-                    subCellObject.transform.SetParent(transform, false);
-                    subCellRenderer = subCellObject.GetComponent<SpriteRenderer>();
-                    if (subCellRenderer == null)
-                    {
-                        subCellRenderer = subCellObject.AddComponent<SpriteRenderer>();
-                    }
-
-                    visualSubCellRenderers[i] = subCellRenderer;
-                }
-
-                subCellRenderer.name = $"SelectionTileVisualSubCell_{i}";
-                subCellRenderer.sprite = generatedTileSprite;
-                subCellRenderer.sortingOrder = sortingOrderBase + i;
-                subCellRenderer.transform.localPosition = new Vector3(startX + (i * step), 0f, 0f);
-                subCellRenderer.transform.localScale = new Vector3(visualSubCellSize, visualSubCellSize, 1f);
-            }
+            spriteRenderer.enabled = !IsRemoved;
+            spriteRenderer.color = displayColor;
         }
 
         private UnityEngine.Color ApplyLockedBrightness(UnityEngine.Color source)
