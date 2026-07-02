@@ -7,15 +7,29 @@ namespace EliminateGame.ImageRockGameplay
     public sealed class ImageRockSelectionAreaController : MonoBehaviour
     {
         [SerializeField] private Transform tileRoot;
-        [SerializeField] private float tileSize = 0.35f;
-        [SerializeField] private float spacing = 0.42f;
-        [SerializeField] private int columns = 10;
+        [SerializeField] private float tileSize = 0.30f;
+        [SerializeField] private float spacing = 0.36f;
+        [SerializeField] private int columns = 12;
         [SerializeField] private int sortingOrderBase = 200;
 
         public event Action<ImageRockSelectionTile> TileClicked;
 
         private readonly List<ImageRockSelectionTile> tiles = new List<ImageRockSelectionTile>();
         private static readonly ImageRockColor[] ColorOrder = { ImageRockColor.Brown, ImageRockColor.Dark, ImageRockColor.Green, ImageRockColor.Cream, ImageRockColor.Pink, ImageRockColor.Yellow, ImageRockColor.White, ImageRockColor.Blue };
+
+
+        public void BuildFixedPoolFromTotalCounts(Dictionary<ImageRockColor, int> totalCounts)
+        {
+            ClearTiles();
+            if (tileRoot == null) tileRoot = transform;
+            int index = 0;
+            foreach (ImageRockColor color in ColorOrder)
+            {
+                int totalCount = totalCounts != null && totalCounts.ContainsKey(color) ? totalCounts[color] : 0;
+                int tileCount = totalCount > 0 ? Mathf.CeilToInt(totalCount / 3f) : 0;
+                for (int i = 0; i < tileCount; i++) CreateTile(color, index++);
+            }
+        }
 
         public void RebuildFromBottomExposedCounts(Dictionary<ImageRockColor, int> bottomCounts)
         {
