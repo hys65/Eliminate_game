@@ -52,6 +52,8 @@ namespace EliminateGame.ImageRockGameplay
             int row = index / columns;
             go.transform.localPosition = new Vector3((col - (columns - 1) * 0.5f) * spacing, -row * spacing, 0f);
             go.transform.localScale = Vector3.one * tileSize;
+            go.AddComponent<SpriteRenderer>();
+            go.AddComponent<BoxCollider2D>();
             ImageRockSelectionTile tile = go.AddComponent<ImageRockSelectionTile>();
             tile.Initialize(color, ImageRockGridController.GetGeneratedSprite(), ImageRockGridController.ToDisplayColor(color), sortingOrderBase + row);
             tile.Clicked += OnTileClicked;
