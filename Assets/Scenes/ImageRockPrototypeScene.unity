@@ -173,6 +173,7 @@ MonoBehaviour:
   selectionArea: {fileID: 4002}
   rocksRemovedPerClick: 3
   winPanel: {fileID: 5000}
+  showRestartButton: 1
 --- !u!1 &3000
 GameObject:
   m_ObjectHideFlags: 0
@@ -205,6 +206,8 @@ MonoBehaviour:
   spacing: 0.01
   sortingOrderBase: 500
   buildOnStart: 0
+  visualConfig: {fileID: 11400000, guid: 167fd1a0af712bf4980dd9ffa336eeb2, type: 2}
+  buildFromVisualConfig: 1
 --- !u!1 &4000
 GameObject:
   m_ObjectHideFlags: 0
@@ -220,7 +223,7 @@ Transform:
   m_ObjectHideFlags: 0
   m_GameObject: {fileID: 4000}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: -3.2, z: 0}
+  m_LocalPosition: {x: 0, y: -3.4, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}
@@ -231,9 +234,9 @@ MonoBehaviour:
   m_Enabled: 1
   m_Script: {fileID: 11500000, guid: 8fc4e96e3a684b5fb09ee20296000930, type: 3}
   tileRoot: {fileID: 4001}
-  tileSize: 0.35
-  spacing: 0.42
-  columns: 10
+  tileSize: 0.3
+  spacing: 0.36
+  columns: 12
   sortingOrderBase: 200
 --- !u!1 &5000
 GameObject:

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using EliminateGame.Visual;
 using UnityEngine;
 
 namespace EliminateGame.ImageRockGameplay
@@ -13,6 +14,8 @@ namespace EliminateGame.ImageRockGameplay
         [SerializeField] private float spacing = 0.01f;
         [SerializeField] private int sortingOrderBase = 500;
         [SerializeField] private bool buildOnStart = false;
+        [SerializeField] private LargePatternVisualConfig visualConfig;
+        [SerializeField] private bool buildFromVisualConfig = true;
 
         private ImageRockCell[,] cells;
         private static Sprite generatedSprite;
@@ -28,6 +31,43 @@ namespace EliminateGame.ImageRockGameplay
         public void BuildGrid()
         {
             ClearGrid();
+            if (buildFromVisualConfig && visualConfig != null && visualConfig.ValidateSize())
+            {
+                BuildGridFromVisualConfig();
+            }
+            else
+            {
+                BuildFallbackGrid();
+            }
+        }
+
+        private void BuildGridFromVisualConfig()
+        {
+            if (cellRoot == null) cellRoot = transform;
+            width = visualConfig.Width;
+            height = visualConfig.Height;
+            cellSize = visualConfig.CellSize;
+            cells = new ImageRockCell[width, height];
+            Sprite sprite = GetGeneratedSprite();
+
+            for (int dataY = 0; dataY < height; dataY++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    if (!TryGetConfigCell(x, dataY, out Color displayColor, out int paletteIndex)) continue;
+                    if (paletteIndex == LargePatternVisualConfig.TransparentPaletteIndex || displayColor.a <= 0.01f) continue;
+
+                    ImageRockColor gameplayColor = MapPaletteColorToRockColor(displayColor);
+                    if (gameplayColor == ImageRockColor.None) continue;
+
+                    int y = ConvertDataYToRenderRow(dataY);
+                    CreateCell(x, y, gameplayColor, displayColor, sprite);
+                }
+            }
+        }
+
+        private void BuildFallbackGrid()
+        {
             if (cellRoot == null) cellRoot = transform;
             cells = new ImageRockCell[width, height];
             ImageRockColor[,] layout = CreateMonkeyLikeLayout();
@@ -38,15 +78,20 @@ namespace EliminateGame.ImageRockGameplay
                 {
                     ImageRockColor color = layout[x, y];
                     if (color == ImageRockColor.None) continue;
-                    GameObject go = new GameObject($"ImageRockCell_{x:00}_{y:00}");
-                    go.transform.SetParent(cellRoot, false);
-                    ImageRockCell cell = go.AddComponent<ImageRockCell>();
-                    cell.Initialize(x, y, color, sprite, ToDisplayColor(color), sortingOrderBase + y);
-                    cell.SetGridPosition(x, y, GetLocalPosition(x, y));
-                    go.transform.localScale = Vector3.one * cellSize;
-                    cells[x, y] = cell;
+                    CreateCell(x, y, color, ToDisplayColor(color), sprite);
                 }
             }
+        }
+
+        private void CreateCell(int x, int y, ImageRockColor gameplayColor, Color displayColor, Sprite sprite)
+        {
+            GameObject go = new GameObject($"ImageRockCell_{x:00}_{y:00}");
+            go.transform.SetParent(cellRoot, false);
+            ImageRockCell cell = go.AddComponent<ImageRockCell>();
+            cell.Initialize(x, y, gameplayColor, sprite, displayColor, sortingOrderBase + y);
+            cell.SetGridPosition(x, y, GetLocalPosition(x, y));
+            go.transform.localScale = Vector3.one * cellSize;
+            cells[x, y] = cell;
         }
 
         public void ResetGrid()
@@ -69,6 +114,14 @@ namespace EliminateGame.ImageRockGameplay
             int count = 0;
             ForEachCell(cell => { if (!cell.IsRemoved) count++; });
             return count;
+        }
+
+
+        public Dictionary<ImageRockColor, int> GetInitialColorCounts()
+        {
+            Dictionary<ImageRockColor, int> counts = CreateColorDictionary();
+            ForEachCell(cell => { if (cell.Color != ImageRockColor.None) counts[cell.Color]++; });
+            return counts;
         }
 
         public Dictionary<ImageRockColor, int> GetRemainingColorCounts()
@@ -166,6 +219,38 @@ namespace EliminateGame.ImageRockGameplay
                 }
             }
             return layout;
+        }
+
+
+        private bool TryGetConfigCell(int x, int dataY, out Color color, out int paletteIndex)
+        {
+            color = Color.clear;
+            paletteIndex = LargePatternVisualConfig.TransparentPaletteIndex;
+            if (visualConfig == null) return false;
+            if (visualConfig.HasValidPaletteData) return visualConfig.TryGetPaletteCellColor(x, dataY, out color, out paletteIndex);
+            color = ToDisplayColor(ImageRockColor.Brown);
+            paletteIndex = -1;
+            return visualConfig.GetCell(x, dataY) != EliminateGame.Pattern.BlockColor.None;
+        }
+
+        private int ConvertDataYToRenderRow(int dataY)
+        {
+            return height - 1 - dataY;
+        }
+
+        private ImageRockColor MapPaletteColorToRockColor(Color color)
+        {
+            if (color.a <= 0.01f) return ImageRockColor.None;
+            Color.RGBToHSV(color, out float hue, out float saturation, out float value);
+            if (value < 0.25f) return ImageRockColor.Dark;
+            if (color.g > color.r && color.g > color.b && saturation > 0.25f) return ImageRockColor.Green;
+            if (color.r > 0.7f && color.b > 0.5f) return ImageRockColor.Pink;
+            if (color.r > 0.65f && color.g > 0.45f && color.b < 0.35f) return ImageRockColor.Brown;
+            if (color.r > 0.75f && color.g > 0.65f && color.b < 0.35f) return ImageRockColor.Yellow;
+            if (color.b > color.r && color.b > color.g) return ImageRockColor.Blue;
+            if (color.r > 0.75f && color.g > 0.65f && color.b > 0.5f) return ImageRockColor.Cream;
+            if (hue >= 0.10f && hue <= 0.18f && saturation > 0.25f) return ImageRockColor.Yellow;
+            return ImageRockColor.Brown;
         }
 
         private Vector3 GetLocalPosition(int x, int y)

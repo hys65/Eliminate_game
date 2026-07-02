@@ -8,15 +8,14 @@ namespace EliminateGame.ImageRockGameplay
         [SerializeField] private ImageRockSelectionAreaController selectionArea;
         [SerializeField] private int rocksRemovedPerClick = 3;
         [SerializeField] private GameObject winPanel;
+        [SerializeField] private bool showRestartButton = true;
 
         private bool hasWon;
 
         private void Start()
         {
-            if (winPanel != null) winPanel.SetActive(false);
-            rockGrid.BuildGrid();
-            selectionArea.RebuildFromBottomExposedCounts(rockGrid.GetBottomExposedColorCounts());
             selectionArea.TileClicked += OnTileClicked;
+            RestartRun();
         }
 
         private void OnDestroy()
@@ -42,7 +41,25 @@ namespace EliminateGame.ImageRockGameplay
                 selectionArea.ClearTiles();
                 return;
             }
-            selectionArea.RebuildFromBottomExposedCounts(rockGrid.GetBottomExposedColorCounts());
+        }
+
+        public void RestartRun()
+        {
+            hasWon = false;
+            if (winPanel != null) winPanel.SetActive(false);
+            rockGrid.ClearGrid();
+            selectionArea.ClearTiles();
+            rockGrid.BuildGrid();
+            selectionArea.BuildFixedPoolFromTotalCounts(rockGrid.GetInitialColorCounts());
+        }
+
+        private void OnGUI()
+        {
+            if (!showRestartButton) return;
+            if (GUI.Button(new Rect(16, 16, 96, 32), "Restart"))
+            {
+                RestartRun();
+            }
         }
     }
 }
